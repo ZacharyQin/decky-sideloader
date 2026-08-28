@@ -1,0 +1,11 @@
+{
+  "name": "GitHub Sideload",
+  "author": "zacharym",
+  "flags": ["debug"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["utility", "updater"],
+    "description": "List zip-installed Decky plugins, bind GitHub repos, check releases, and switch versions.",
+    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/decky-plugin-template"
+  }
+}
