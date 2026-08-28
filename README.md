@@ -2,7 +2,7 @@
 
 Decky 插件：管理本机 zip/GitHub 来源的非商店插件，绑定仓库，查询与切换 GitHub Release 版本。
 
-当前仓库是官方 `decky-plugin-template` 骨架。产品行为尚未实现。需求原文与续接约定见 `HANDOFF.md`。设计见 `docs/superpowers/specs/2026-08-29-github-sideload-design.md`。
+当前已接 loader 安装通道：列出非商店插件、从 zip URL 安装、卸载。GitHub 绑定与换版本未做。需求原文见 `HANDOFF.md`。设计见 `docs/superpowers/specs/2026-08-29-github-sideload-design.md`。
 
 ## 构建
 

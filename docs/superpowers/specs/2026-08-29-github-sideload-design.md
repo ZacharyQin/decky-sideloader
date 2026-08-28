@@ -227,14 +227,26 @@ QAM 面板。组件全部来自 `@decky/ui` / `@decky/api`，对照 `frontend-ui
 
 本仓库。ping/emit 可构建。
 
-### P1：安装通道 spike
+### P1：安装通道（源码已核实，设备未跑）
 
-在真实 Deck 或本机 loader 前端上下文里验证：
+loader `frontend/src/index.ts` 在插件 import 之前执行：
 
-1. 插件 bundle 能否看见 `DeckyBackend`
-2. 能否 `callable('utilities/install_plugin')` / `uninstall_plugin`
-3. 用一个测试 zip 走完整确认弹窗
-4. 失败则记录具体错误，停在 P1，不开始列表 UI 的安装按钮
+```ts
+window.DeckyBackend = new WSRouter();
+await DeckyBackend.connect();
+```
+
+`start.tsx` 再设 `window.DeckyPluginLoader`。插件 bundle 是同一窗口里的 `import(http://127.0.0.1:1337/plugins/.../dist/index.js)`。
+
+`@decky/api` 的 `call` 只打到本插件 Python，不能用来装别的插件。
+
+本仓库适配层：
+
+- 安装：`window.DeckyBackend.call("utilities/install_plugin", artifact, name, version, "", installType)`
+- 卸载：`window.DeckyPluginLoader.uninstallPlugin(...)`（官方确认框）
+- 启动时 `probeLoaderChannel()`，通道不在就禁用按钮
+
+设备上仍需用一个测试 zip 点一次确认框。
 
 ### P2：只读列表
 
