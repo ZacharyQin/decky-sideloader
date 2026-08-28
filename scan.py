@@ -1,15 +1,10 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
-_GITHUB_REPO = re.compile(
-    r"(?:github\.com[:/]|git@github\.com:)(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)",
-    re.IGNORECASE,
-)
+from github_meta import parse_github_input
 
 
 def detect_github_repo(package: dict[str, Any] | None) -> str | None:
@@ -27,28 +22,10 @@ def detect_github_repo(package: dict[str, Any] | None) -> str | None:
     if isinstance(homepage, str):
         candidates.append(homepage)
     for raw in candidates:
-        parsed = _parse_github(raw)
+        parsed = parse_github_input(raw)
         if parsed:
             return parsed
     return None
-
-
-def _parse_github(raw: str) -> str | None:
-    match = _GITHUB_REPO.search(raw.replace("git+", ""))
-    if not match:
-        parsed = urlparse(raw)
-        if parsed.netloc.lower() != "github.com":
-            return None
-        parts = [p for p in parsed.path.split("/") if p]
-        if len(parts) < 2:
-            return None
-        owner, repo = parts[0], parts[1]
-    else:
-        owner, repo = match.group("owner"), match.group("repo")
-    repo = repo.removesuffix(".git")
-    if not owner or not repo:
-        return None
-    return f"{owner}/{repo}"
 
 
 def read_plugins_dir(plugins_dir: str) -> list[dict[str, Any]]:
