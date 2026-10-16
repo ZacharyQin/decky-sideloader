@@ -3,8 +3,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+MODULES = ROOT / "py_modules"
+if str(MODULES) not in sys.path:
+    sys.path.insert(0, str(MODULES))
 
 from github_meta import is_newer, parse_github_input, parse_releases, pick_zip_assets
 

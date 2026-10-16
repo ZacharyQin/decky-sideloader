@@ -1,5 +1,7 @@
 # GitHub Sideload 设计
 
+> 历史首版方案。当前界面与安装行为以 `docs/upstream-conflict/sideload/plugin-management.md` 为准，进度见 `HANDOFF.md`。本文 2.4 中 Loader 保留 settings 的事实不能替代实际备份；当前实现已单独备份标准 settings/data。
+
 日期：2026-08-29
 
 本文是第一版规划，不是 implementation plan。实现前必须先完成「安装通道」spike。

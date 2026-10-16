@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# Semantic index:
+# - participant: docs/upstream-conflict/sideload/plugin-management.md -- distinguish unknown store membership from absent plugins.
 import json
 from pathlib import Path
 from typing import Any
@@ -35,11 +37,13 @@ def read_plugins_dir(plugins_dir: str) -> list[dict[str, Any]]:
     plugins: list[dict[str, Any]] = []
     for child in sorted(root.iterdir()):
         plugin_json_path = child / "plugin.json"
-        if not child.is_dir() or not plugin_json_path.is_file():
+        if child.is_symlink() or not child.is_dir() or not plugin_json_path.is_file():
             continue
         try:
             plugin_json = json.loads(plugin_json_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(plugin_json, dict):
             continue
         name = plugin_json.get("name")
         if not isinstance(name, str) or not name.strip():

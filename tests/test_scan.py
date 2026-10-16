@@ -5,8 +5,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+MODULES = ROOT / "py_modules"
+if str(MODULES) not in sys.path:
+    sys.path.insert(0, str(MODULES))
 
 from scan import classify_plugins, detect_github_repo, read_plugins_dir
 
