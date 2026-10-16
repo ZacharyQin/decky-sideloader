@@ -19,6 +19,8 @@ export const pluginKey = (plugin: PluginRow): string => plugin.folder ?? `loader
 export const pluginReadOnly = (plugin: PluginRow): boolean => plugin.folder === null || plugin.management?.state === "ambiguous";
 export const pluginEligible = (plugin: PluginRow): boolean => !plugin.is_self && !pluginReadOnly(plugin) &&
   (plugin.ownership ? plugin.ownership.eligible : plugin.in_store !== true && plugin.sideload);
+export const pluginCanTakeOver = (plugin: PluginRow): boolean => !plugin.is_self && !pluginReadOnly(plugin) &&
+  (plugin.in_store === true || plugin.cached_in_store === true || plugin.memory_in_store === true || plugin.ownership?.state === "store");
 export const pluginCanBind = (plugin: PluginRow): boolean => !plugin.is_self && !pluginReadOnly(plugin) &&
   (pluginEligible(plugin) && plugin.ownership?.state !== "owned" ||
     plugin.in_store === null && plugin.cached_in_store !== true && (!plugin.ownership || plugin.ownership.state === "unknown" && !plugin.ownership.intent && !plugin.ownership.error));

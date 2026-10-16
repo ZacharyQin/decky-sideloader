@@ -1,6 +1,6 @@
 ---
 semantic_state: active
-last_reviewed: 2026-10-16
+last_reviewed: 2026-10-17
 origin: 用户要求重新设计 GitHub Sideload 界面并由主代理实施
 provenance:
   - HANDOFF.md
@@ -59,12 +59,23 @@ superseded_by: null
 
 独立的 [有界诊断与导出契约](diagnostics.md) 仅观测此流程，不能改变事务顺序、安装裁决、管理SSOT或现有错误反馈。
 
+### 本地关系与手动刷新
+
+- 普通列表、QAM重挂、详情/设置导航、手动与定时GitHub更新检查和安装授权只读本地关系，不请求商店或登记服务。`list_sideload_plugins(refresh=False)`是默认只读路径，只有唯一刷新图标调用`refresh=True`。GitHub查询仍按原用户偏好进行，不顺带刷新商店。
+- `catalog.json`在本插件SDK settings目录保存version=1的成功目录、累计商店正向名称及按name/folder/package.name记录的识别事实和仓库。可读旧timestamp/names格式；新记录最多512项，商店名称最多4096项，总4MiB，字段有界、有限时间、唯一键、regular/no-follow/本UID/单链接校验，0600临时文件/fsync/原子替换，写成功才发布内存。失败不覆盖旧记录或伪装空目录成功，损坏文件保留并阻止从损坏历史推导权限。此文件包含持久状态，不能按临时缓存清理；旧版刷新可能重写新字段，版本回退前须保留该状态。
+- 已确认关系不因5分钟、7天或进程重载消失。当前目录与累计商店正向历史独立，商店暂时移除名称不自动变成非商店授权。旧目录中的缺席不为后来新装项或新身份授予权限，负向事实必须来自显式成功刷新当时的唯一、匹配本地身份。版本变化不改变身份；目录、package.name或已有明确仓库元数据变化要求重新确认，旧事实不被刷新自动改绑。
+- 手动绑定和已核验安装的幂等关联保存同步记录folder/package.name/package.repository身份标记，仍与接管ledger独立。显式确认的新绑定可修复非商店身份变化，旧名称绑定不能跳过已发现的身份冲突。缺少仓库元数据可使用匹配记忆的仓库并标记remembered；显式disabled优先，不能恢复用户已解除的追踪。
+- 归属仍由ownership.resolve集中裁决，持久历史不单独等于商店接管。已知历史商店项可通过既有独立入口显式确认仓库并执行冻结/回查，不依赖实时目录。身份变化的active接管项禁止安装，仍可显式交还并重新接管。
+- 首页不显示商店来源、缓存过期、目录时间或正常Loader清单计数。摘要右侧只保留一个原生DialogButton刷新图标，含可访问名称和A动作说明，装饰图标不增加焦点，busy真实旋转且禁重复，遵守reduced-motion。只在实际读取失败时显示简短错误并保留有效旧列表，不暴露缓存工作原理。
+- checkController区分默认读取和一次性显式刷新意图，跨QAM合并，检查进行时排队，网络刷新已在途的重复点击不再排一次；原generation、listError/checkError、正常读取和检查队列契约保留。新检查使旧读取失效不自动重放商店请求。
+- 显式刷新持有原归属锁，活动安装任务及恢复的活动任务期间拒绝变更来源。真实Catalog worker登记并shield，取消外层RPC仍等待线程；unload先撤销诊断分享，再等待已启动Catalog worker，停止后的排队刷新不得新写盘。普通读取始终零商店网络。
+
 ### 显式商店接管与交还
 
-- 业务结果：已知当前商店插件默认由商店负责。普通列表不把它们列为待关联；首页另有“接管商店插件”入口。异常可见性独立，Native-only 与同名多目录始终只读。来源未知不能推断商店或非商店，元数据仓库不构成所有权；未知来源的显式用户仓库修复能力保留，过期缓存已知商店项不能借此绕过。
+- 业务结果：已知当前或历史商店插件默认由商店负责。普通列表不把它们列为待关联；首页另有“接管商店插件”入口。异常可见性独立，Native-only与同名多目录始终只读。缺少有效本地记录时不猜商店或非商店，元数据仓库不构成所有权；匹配身份的持久非商店关系继续管理，未知来源的显式用户仓库修复保留，历史已知商店项不能借此绕过。
 - `py_modules/ownership.py` 是归属裁决与 ledger schema 的 owner。`main.py` 组合磁盘、商店、绑定、独立 ledger 和原生冻结回查，输出 `ownership.state/eligible/intent/error`。`src/loaderManagement.ts` 只增加 Loader 只读约束，`pluginEligible` 是前端统一资格入口，页面不能自行用 repo_source、加载状态或旧报告授予权限。
 - ledger 位于本插件设置目录 `ownership.json`，不附着于 `bindings`。缺失为 version=1/空 entries；损坏不覆盖、不默认为已接管，禁用 mutation。最多 512 个唯一 name+folder 条目、1 MiB；名称/目录/仓库最多 256 字符，目录必须是 basename，intent id 为 32 位十六进制，prior_frozen 为严格 boolean。读取有界、regular/no-follow，读取与写入前使用同一完整 schema 校验；容量检查使用与持久化一致的 UTF-8、ensure_ascii=false、indent=2 序列化字节数。无效候选不得替换已有 ledger。写入使用既有独占临时文件/fsync/原子替换。旧绑定原样保留，不迁移为同意。
-- RPC `begin_store_ownership(name,folder,repo,action)` 只接受唯一非自身磁盘身份；takeover 必须有当前已知商店 membership 和有效、显式确认的仓库。先记录原冻结值、动作、新 intent id 和 prepared，再允许原生副作用。return 只由 active 记录产生新意图，继承原 prior_frozen。目标存在活动安装任务，包括恢复的旧 ready、未知任务和尚未产出包的 target 时，禁止修改归属或关联。
+- RPC `begin_store_ownership(name,folder,repo,action)` 只接受唯一非自身磁盘身份；takeover必须有已确认的当前或历史商店正向记录和有效、显式确认的仓库。先记录原冻结值、动作、新 intent id 和 prepared，再允许原生副作用。return 只由 active 记录产生新意图，继承原 prior_frozen。目标存在活动安装任务，包括恢复的旧 ready、未知任务和尚未产出包的 target 时，禁止修改归属或关联。
 - `ownership_native_step(id,phase)` 以当前 intent id、名称、目录和活动任务再次核验。read 只返回该意图与 bounded frozen 名称；writing 先持久化原生写入领取；confirming 表示原生调用已返回，不等于激活；complete 必须核对当前冻结值与 desired policy，才保存 active/released。prepared 不能直接 complete。原生失败、超时、重载或保存失败保持未确认；显式“回查接管结果”可在 writing/confirming 后核对落盘结果，“显式继续冻结操作”使用同一意图读取最新列表再写，不自动重试。不恢复全局旧快照，旧 id 不得激活新意图。
 - `src/ownershipController.ts` 在 QAM 外保存单一动作、错误与原生 Promise。QAM 重挂不重放；插件卸载使后续步骤失效。原生等待 10 秒后提示未知，但超时不等于底层取消，本前端实例仍等真实调用结束才解除排他；迟到回调不激活。`loaderBridge.ts` 只调用已验证的 frozenPluginsService.update/invalidate，保留接收者，不猜写设置 RPC。每次基于后端最新列表只增加/移除当前名称，保留无关名称。
 - Loader 后端设置仅从 SDK DECKY_HOME/settings/loader.json 读取 `frozenPlugins`。4 MiB 有界 regular/no-follow 文件，最多 4096 个唯一受限名称。损坏、缺文件和无法读取是未知；合法配置缺 key 才等于默认空数组。不得返回或记录完整 Loader 配置、用户资料。
@@ -79,13 +90,13 @@ superseded_by: null
 - `src/api.ts` 是统一列表读取边界：普通列表、手动检查返回、关联后重读、新装探查和定时触发重读均通过 `loaderBridge.ts` 无参数调用 `window.DeckyBackend.call("loader/get_plugins")`，再由 `loaderManagement.ts` 纯合并。后端提供磁盘、商店与中央归属事实，后端 RPC 失败照常拒绝；Loader 读取失败独立返回错误，不清除检查错误或伪装成功空清单。
 - Loader 管理快照必须是唯一非空名称、string/null version、有限数值 load_type、boolean disabled 的完整数组。接口缺失、拒绝、损坏、重复名称或 5 秒超时使 Loader 状态未知；合法空数组表示当前未登记。迟到结果不修改快照，不持久化管理信息，不依赖安装事件或卸载通道。
 - Loader 管理集合与商店来源独立。唯一显示名磁盘项获得 enabled/disabled；仅磁盘项保留并标记未登记，不能据此推非商店。多个同名目录全部保留并标歧义，只读；不任选绑定。Loader-only 项保留 null folder、null 包内 version、未知 in_store，无猜测 slug/仓库。自身以准确名称排除。
-- 包内 version 始终用于 GitHub 比较、报告身份与安装核验；Loader version 独立展示，差异只提示、不修复、不判安装成功。Native-only 详情仅显示 Loader记录版本。商店实时/缓存/过期/登记、用户绑定与显式所有权分别展示。用户绑定不能覆盖商店责任。
+- 包内 version 始终用于 GitHub 比较、报告身份与安装核验；Loader version 独立展示，差异只提示、不修复、不判安装成功。Native-only 详情仅显示 Loader记录版本。商店历史、用户绑定与显式所有权分别判定，页面不显示缓存工作原理。用户绑定不能覆盖商店责任。
 - 首页默认保留既有 GitHub 管理范围，同时展示 Native-only、禁用、未登记、目录歧义及版本不一致项，不强制列出所有正常商店项；Loader 读取状态/错误只显示一次。原目录 key 不变，Native-only 使用按准确名称编码且含 `/` 的稳定 key，避免与真实目录 basename 冲突，贯穿分组、React key、详情选择与一次性返回焦点。
 - Native-only 与目录歧义详情不读取 Release，不提供安装、卸载、绑定或解绑；检查记录不能为它们显示可执行更新，但只读详情仍以历史记录保留检查时间、检查时仓库、版本及完整错误。当前磁盘可核验项在 Loader 未知或未登记时仍保留受校验管理能力。定时后端检查规则、settings schema、安装控制器与安全闭环不受管理快照影响。
 
 - `src/index.tsx` 控制首页、详情、仓库、新装、设置、网络连接、诊断内页、定时检查结果、安装任务页面；页面切换以 `key` 重建外层容器并触发原生 `autoFocus`。仅显式从详情返回首页/结果页，或从结果/网络/诊断内页返回设置时，使用 `PREFERRED_CHILD` 和对应行的 `preferredFocus` 恢复位置；首次 `onGamepadFocus` 消费恢复意图，此后使用 `FIRST` 按可见顺序进入，顶部返回箭头向下不得持续跳到上次插件行。恢复意图跨 QAM 保留，不使用定时猜测或自造导航。处理子页面 B 键时同时 `preventDefault` 和 `stopPropagation`，首页 B 交还 Loader。使用原生组件、主题及 A/B 导航语义。
 - Decky 原生版本下拉框及键盘可能卸载 QAM 内容；`viewState.ts` 在前端会话内保留页面、输入草稿、安装预览和所选版本，并向重挂载后的组件发布旧弹窗回调的结果。详情选择以插件目录、仓库和已安装版本隔离；发布或资产消失时禁用对应选择，不静默换包。安装任务仍以后端持久化状态为准。
-- `src/Home.tsx` 每条插件只有一个焦点。人工检查可重新分组；普通后台刷新保留当前分组避免焦点行移动。缓存的可更新组出现不再匹配 update 的成员时，标题改为中性的“检查结果”，保留原分组 key 与行位置，不让失败或旧结果继续被分组标题标成可更新。`checkController.ts` 保存独立的 checking/refreshing、唯一检查与列表刷新 Promise、列表和分源的 listError/checkError，兼容既有 error 读取接口。来源重试立即显示原生加载图标、aria-busy及“正在识别来源”，等待检查时显示“等待检查完成”；同一读取合并、跨QAM保留，成功或失败均在finally恢复可重试。来源RPC读取错误以“来源读取失败”单独呈现，即使旧列表商店成功或当前无列表也保留可重试入口，不伪装成更新检查失败；商店仍不可用时保留真实缓存/登记/错误信息，不宣称识别成功。QAM 卸载/重开不终止检查或允许重复发起，成功与失败均在 finally 停止 busy。检查期间的列表刷新合并排队，检查结束后实际读当前列表；旧读取按 generation 隔离，不能覆盖较新检查或其 loading。普通列表成功只清 listError，checkError 跨重挂载保留，由下一次检查失败更新或成功清除，重试进行中仍保留。检查按钮仅在真实检查时旋转装饰 SVG，遵守 prefers-reduced-motion。首页仅检查更新使用满宽主按钮，安装入口、显示范围和设置使用原生单焦点 Field，保持动作标识、禁用与回调保护，安装和任务页内部按钮不变，查看现有任务的导航入口使用次级原生 Field。
+- `src/Home.tsx` 每条插件只有一个焦点。人工检查可重新分组；普通后台刷新保留当前分组避免焦点行移动。缓存的可更新组出现不再匹配 update 的成员时，标题改为中性的“检查结果”，保留原分组 key 与行位置，不让失败或旧结果继续被分组标题标成可更新。`checkController.ts` 保存独立的 checking/refreshing、唯一检查与列表刷新 Promise、列表和分源的 listError/checkError，兼容既有 error 读取接口。唯一刷新图标即时显示aria-busy和真实旋转，等待检查时仍保持busy；同一显式意图合并并跨QAM保留，finally恢复可重试。读取错误以简短“刷新失败”单独呈现，始终保留图标入口，不伪装成更新检查失败，不展示缓存或登记运作说明。QAM 卸载/重开不终止检查或允许重复发起，成功与失败均在 finally 停止 busy。检查期间的列表刷新合并排队，检查结束后实际读当前列表；旧读取按 generation 隔离，不能覆盖较新检查或其 loading。普通列表成功只清 listError，checkError 跨重挂载保留，由下一次检查失败更新或成功清除，重试进行中仍保留。检查按钮仅在真实检查时旋转装饰 SVG，遵守 prefers-reduced-motion。首页仅检查更新使用满宽主按钮，安装入口、显示范围和设置使用原生单焦点 Field，保持动作标识、禁用与回调保护，安装和任务页内部按钮不变，查看现有任务的导航入口使用次级原生 Field。
 - `src/InstalledTab.tsx` 自动读取 Release，保留普通更新/切换版本/同版重装，另设显式“卸载并安装”，两者不互相替代；仓库关联与单独卸载分开。
 - `src/InstallTab.tsx` 保留完整 GitHub 地址/owner-repo 直填，并复用 `RepositorySearch.tsx` 的搜索呈现，新装结果使用原生下拉且不默认选择仓库。两种入口统一探查，单插件进入发布预览，多插件需原生下拉显式选目录后读取版本；不满足 Decky 特征则阻止继续。可核验磁盘项只有名称和仓库均匹配时才转入管理；同名但当前不具管理资格的商店项优先进入接管详情，同仓库其他插件不得误转入；同名 Native-only 或目录歧义项优先进入只读详情，不读取 Release。包身份/目录碰撞仍由后端阻止。
 - 新装的模式、关键词、结果、仓库选择、探查、插件路径和 Release/ZIP 选择都在 QAM 会话状态中。编辑输入、切换入口/仓库/插件或结束新装会使旧请求失效；旧原生弹窗不得改写其他仓库的选择。B 从预览回插件选择，再回仓库输入，输入页 B 交还上层。
@@ -98,8 +109,8 @@ superseded_by: null
 - `persist.py` 保存显式停追踪标记，解除关联不得被 metadata 自动探测恢复，也不得卸载插件；仓库选择仍走现有 `set_binding` 校验，不跳过安装包身份检查。JSON 持久化使用独占创建的 0600 唯一临时文件、fsync 与原子替换，避免进度/目录缓存及重载线程争用同名临时文件；只清理本次创建的临时文件。
 - `github_meta.py` 精确解析 GitHub 主机和仓库，按发布时间展示发布；选择最新无资产版本不得自动降到旧版，多资产必须手选。Semver 同版/新版/旧版/未知分别表达，不把任意标签前缀当完整版本。
 - `scan.py` 区分商店存在、不存在和未知；手动绑定只覆盖仓库探测，不授予商店接管权限。不声称已经接入自定义频道。来源未知项直接显示，不要求先展开其他插件。
-- `catalog.py` 只缓存完整校验的官方商店成功目录，最多 4096 个合法显示名，响应/持久化读取限制 4 MiB。成功缓存复用 5 分钟，最长保留 7 天；失败不覆盖成功缓存。商店单连接超时 3 秒，分块读取检查 5 秒总预算。缓存响应明确来源、原获取时间、过期状态与错误；过期缓存不能给出当前商店 membership，`in_store` 保持 null，旧缓存匹配另记 `cached_in_store`。
-- 无可用商店快照时，只读官方 `SteamDeckHomebrew/decky-plugin-database/main/.gitmodules`，响应最多 1 MiB，连接超时 3 秒，分块读取检查 8 秒总预算，成功辅助结果缓存 5 分钟。逐 section 校验以允许重复 section，支持 GitHub HTTPS/SCP 与非 GitHub 登记，排除官方模板。只有 canonical GitHub repo 和显式 folder 同时匹配才记 `registration=registered`，不从 slug 猜显示名；缺失匹配不能推断下架或非商店。登记辅助不把 `store_ok` 改成 true，完全失联或格式损坏不能当成空目录成功。UI 区分实时商店、缓存、过期缓存、登记辅助与完全不可用，并提供来源重试。
+- `catalog.py`只通过显式刷新读取完整校验的官方目录，保存有界成功快照和持久身份关系，普通resolve默认纯本地。时间字段用于内部观测，不驱动自动网络或关系过期。默认`in_store=null`表示未重新读取当前目录，独立`cached_in_store/memory_in_store/memory_changed`及ownership表达历史事实、身份冲突与管理资格；不得把null当作丢失已确认关系。
+- 显式刷新商店失败且无成功目录时，可在该次操作内只读官方`.gitmodules`登记辅助；普通读取最多复用当前进程已有辅助结果，不自动联网。仍按canonical仓库与显式folder匹配，登记不授予管理/接管资格，缺失匹配不推断下架或非商店。该次刷新失败返回简短错误，原有效列表保留，不能以辅助结果伪装商店刷新成功。
 - 首页插件行优先由 `pluginIcons.tsx` 复用当前唯一准确名称匹配的已加载前端 `Plugin.icon` React元素，不为图标导入、启用或探测插件源码，不猜远程图标地址，不把图标写入后端DTO或持久配置。图标缺失/无效、重复前端名称、读取异常、禁用、未登记或磁盘归属歧义时回退PuzzlePiece；渲染异常只降级该图标，换新图标后可恢复。图标容器aria-hidden、inert、tabIndex=-1及pointerEvents=none，根图标装饰属性不改变原颜色/样式，保留原生单行焦点。Loader-only/管理未知项可复用唯一已加载图标，但不因此虚构磁盘身份、商店来源或管理成功。
 - `main.py` 每次检查保存每插件状态与错误，读取报告时必须与当前仓库/安装版本匹配；错误、未关联、无发布、无包、不可比较都不是“已最新”。首页只有匹配 `update` 的状态文字旁及汇总使用独立向上箭头 SVG 与 `@decky/ui` 的 `updaterFieldClasses.UpdaterFieldStatusSuccess` 原生成功状态类；更新标记不替代插件自身图标，不增加焦点。状态文字着色独立于插件名称、版本、插件图标及来源。
 - `lastCheck` 保存最近任意检查，`lastScheduledCheck` 仅由定时检查覆盖。新报告含 `source=manual|scheduled`，旧报告缺来源时保留未知；报告含 `checkedAt`、`items`，整轮失败另有顶层 `error` 并保存为空 items，不能沿用旧成功。手动检查不覆盖最近定时结果，也不发送定时通知；调度间隔仍依据 `lastCheck`。
@@ -191,7 +202,9 @@ superseded_by: null
 - `tests/ui.test.tsx` 的task52回归覆盖动画/secondary/reduced-motion、详情busy、两阶段确认取消/B/关闭/重复/重挂/迟到、Native边界取消、持久失败显式回查、无task/活动不可隐藏/终态精确ID关闭与旧响应隔离、诊断内页返回一次焦点；重装安装RPC延迟返回期间收到prompt、取消结果未知后原RPC拒绝，不得再次complete卸载，任务保持活动；真正未完成的卸载回查因取消失败仍可补充回查。
 - `tests/ui.test.tsx` 的安装生命周期回归：普通安装与显式重装分开、原生确认取消与 dismiss、领取失败/RPC失败/目录回查失败、QAM重挂不重放、controller重载不继续、verified继续轮询、成功自动结束及结果入口、快速事件直接回写与旧任务隔离、首次读取延迟/失败时事件缓冲、缓冲固定初始任务及空任务/新建任务/controller销毁隔离、历史详情状态保留次级色与原文、状态span原生颜色、首次原生焦点消费恢复后按可见顺序进入。
 - `tests/ui.test.tsx`：插件自身图标/原样式、装饰inert/不增加焦点、缺失/损坏/重复/禁用/歧义回退、异常渲染隔离及替换恢复、Native-only不虚构身份、插件图标与身份匹配更新箭头并存；匹配更新图标与主题色/单焦点、关闭 QAM 通知、监听清理、保存期间抑制迟到通知、定时实时报告与当前绑定刷新；SVG装饰可访问性、每项操作单按钮与无额外说明控件、既有任务不被改写；网络分离与风险全文/模式默认值、网络返回焦点/QAM保存意图/迟到读取/失败重试、结果状态图标/长名称可访问性/首页单主按钮；模拟原生组件的页面交互、新装搜索下拉/统一探查/monorepo显式选择与身份跳转、搜索后显式保存、过期响应隔离、QAM 重挂载、检查期间改绑/解除后的排队刷新、关闭后检查失败与分源错误保留、B 键与控制器重载行为。
-- `package.json` / `pnpm-lock.yaml`：类型和测试工具；`README.md` / `HANDOFF.md`：使用边界与交接。
+- `tests/test_local_catalog.py`：默认读取/更新检查/授权零商店网络、显式刷新一次、30天及重载仍保留关系、旧目录缺席不授权新身份、目录/包名/仓库冲突、显式重新绑定、解除优先、旧商店与旧绑定不接管、活动任务/保存失败/损坏/链接/超限、真实刷新worker卸载等待/外层RPC取消/停止后排队不写盘。
+- `tests/ui.test.tsx` / `tests/apiFacade.test.ts` 的task53回归：单一原生icon和可访问名称、无常驻来源/日期、默认无true刷新参数、显式点击与跨QAM合并、检查排队/错误隔离、历史商店隐藏与显式接管、记忆非商店仍可管理。
+- `package.json` / `pnpm-lock.yaml`：类型和测试工具；`README.md` / `HANDOFF.md` / `CHANGELOG.md`：使用边界、版本与交接。
 - Merge-time actions: 重新核对 Loader RPC、事件参数及 Decky 原生控件声明，再保留本需求语义。
 
 - `tests/ui.test.tsx` 另验证商店默认隐藏与独立接管、无授权详情和新装匹配、显式仓库确认、次级说明、原生顺序及无关名单/原冻结、失败/超时/重挂/卸载/迟到回调不激活、交还代替 unlink、报告同意身份及独立卸载授权；`tests/apiFacade.test.ts` 验证接管 DTO 边界，`tests/loaderBridge.test.ts` 验证原生冻结服务接收者与禁止猜测设置 RPC。

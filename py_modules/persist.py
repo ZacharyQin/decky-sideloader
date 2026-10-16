@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 # Semantic index:
-# - participant: docs/upstream-conflict/sideload/plugin-management.md -- validate notification defaults and separate scheduled reports; explicit unlink and atomic owned writes remain intact.
+# - participant: docs/upstream-conflict/sideload/plugin-management.md -- preserve atomic settings and explicit unlink while binding confirmed repositories to local identity.
 from datetime import datetime
 import json
 import os
 import tempfile
 from pathlib import Path
 from typing import Any
+
+from github_meta import parse_github_input
 
 
 def load_settings(path: str) -> dict[str, Any]:
@@ -65,6 +67,12 @@ def apply_bindings(plugins: list[dict[str, Any]], bindings: dict[str, Any]) -> l
     for plugin in plugins:
         row = dict(plugin)
         binding = bindings.get(row["name"])
+        if isinstance(binding, dict) and "folder" in binding:
+            package_repo = parse_github_input(row.get("repo") or "")
+            saved_repo = binding.get("package_repo")
+            saved_repo_valid = saved_repo is None or isinstance(saved_repo, str) and parse_github_input(saved_repo) == saved_repo
+            row["binding_changed"] = binding["folder"] != row["folder"] or binding.get("package_name") != row.get("package_name") or not saved_repo_valid or bool(saved_repo and package_repo and saved_repo.lower() != package_repo.lower())
+            row["binding_confirmed"] = not row["binding_changed"]
         if isinstance(binding, dict) and binding.get("disabled"):
             row["repo"], row["repo_source"] = None, "disabled"
         elif isinstance(binding, dict) and isinstance(binding.get("repo"), str) and binding["repo"].strip():

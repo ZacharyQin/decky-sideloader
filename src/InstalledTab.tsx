@@ -2,7 +2,7 @@
 // - participant: docs/upstream-conflict/sideload/plugin-management.md -- keep ordinary install distinct from confirmed reinstall preparation and native standalone uninstall.
 import { PanelSection } from "@decky/ui";
 import { useEffect, useState } from "react";
-import { managementReason, pluginKey, pluginReadOnly, pluginEligible, pluginCanBind } from "./loaderManagement";
+import { managementReason, pluginKey, pluginReadOnly, pluginEligible, pluginCanBind, pluginCanTakeOver } from "./loaderManagement";
 import { listReleases } from "./api";
 import { Action, errorText, Explanation, Status } from "./components";
 import { ReleasePicker } from "./ReleasePicker";
@@ -84,13 +84,13 @@ export function InstalledTab({ plugin: selectedPlugin, onBinding, onOperation, o
   if (!eligible) return <>
     {checkRecord && <CheckRecord {...checkRecord} historical />}
     <PanelSection title={plugin.name}>
-      <Status title={plugin.ownership?.state === "pending" ? "接管结果未确认" : plugin.in_store === true || plugin.ownership?.state === "store" ? "由商店负责" : "归属未知"}>{plugin.ownership?.error}</Status>
+      <Status title={plugin.memory_changed ? "身份已变化，需重新确认" : plugin.ownership?.state === "pending" ? "接管结果未确认" : pluginCanTakeOver(plugin) ? "由商店负责" : "归属待确认"}>{plugin.ownership?.error}</Status>
       <Explanation>仓库关联、已加载状态和旧检查记录不代表接管授权。</Explanation>
-      {plugin.ownership?.intent && plugin.ownership.intent.state !== "released" ? <>
+      {plugin.memory_changed && plugin.ownership?.intent?.state === "active" ? <Action kind="returnStore" disabled={blocked || ownership.busy} onClick={() => void ownershipAction("return")}>交还商店</Action> : plugin.ownership?.intent && plugin.ownership.intent.state !== "released" ? <>
         <Explanation>此前操作尚需回查。继续会读取最新冻结列表，仅调整此插件；未知结果不会自动重试或恢复旧列表。</Explanation>
         <Action kind="readOwnership" disabled={blocked || ownership.busy} onClick={() => void ownershipAction("read")}>回查接管结果</Action>
         <Action kind="takeover" disabled={blocked || ownership.busy} onClick={() => void ownershipAction("continue")}>显式继续冻结操作</Action>
-      </> : plugin.in_store === true && <Action kind="takeover" disabled={blocked || ownership.busy} onClick={onBinding}>接管商店插件</Action>}
+      </> : pluginCanTakeOver(plugin) && <Action kind="takeover" disabled={blocked || ownership.busy} onClick={onBinding}>接管商店插件</Action>}
       {pluginCanBind(plugin) && <Action kind="binding" disabled={blocked} onClick={onBinding}>关联仓库以修复非商店插件追踪</Action>}
       {ownership.error && <Status tone="error" title="接管未确认">{ownership.error}</Status>}
     </PanelSection>
@@ -98,7 +98,7 @@ export function InstalledTab({ plugin: selectedPlugin, onBinding, onOperation, o
   return <>
     {checkRecord && <CheckRecord {...checkRecord} historical={!checkFor(currentPlugin ?? plugin, { checkedAt: checkRecord.checkedAt, items: [checkRecord.item] })} />}
     <PanelSection title={plugin.name}>
-      <Status title={`当前版本 ${plugin.version ?? "未知"}`}>{plugin.ownership?.state === "owned" ? "已接管，商店检查已暂停" : plugin.repo_source === "user" ? "手动加入管理" : plugin.in_store === false ? "当前商店未收录" : plugin.in_store === null ? "来源尚未识别" : "当前商店已收录"}</Status>
+      <Status title={`当前版本 ${plugin.version ?? "未知"}`}>{plugin.ownership?.state === "owned" ? "已接管，商店检查已暂停" : "已加入管理"}</Status>
       {managementReason(plugin) && <Status title="Loader 管理状态">{managementReason(plugin)}</Status>}
       {plugin.management?.versionMismatch && <Status tone="warning" title="版本记录不一致">包内版本 {plugin.version ?? "未知"}，Loader记录版本 {plugin.management.version ?? "未知"}。不会自动修复或判定安装成功。</Status>}
       {!plugin.repo ? <Action kind="binding" onClick={onBinding}>关联 GitHub 仓库</Action> : <>

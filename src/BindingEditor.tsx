@@ -7,14 +7,14 @@ import { Action, errorText, Explanation, Status } from "./components";
 import { RepositorySearch, repositoryDetails } from "./RepositorySearch";
 import { createBindingDraft, getViewState, updateViewState, useViewState, type BindingDraft } from "./viewState";
 import { changeOwnership, useOwnership } from "./ownershipController";
-import { pluginEligible, pluginCanBind } from "./loaderManagement";
+import { pluginEligible, pluginCanBind, pluginCanTakeOver } from "./loaderManagement";
 import type { PluginRow, RepositoryRow } from "./types";
 
 let requestSequence = 0;
 
 export function BindingEditor({ plugin, onSaved }: { plugin: PluginRow; onSaved: () => void }) {
   const ownership = useOwnership(plugin);
-  const takeover = plugin.in_store === true && !pluginEligible(plugin) && (!plugin.ownership?.intent || plugin.ownership.intent.state === "released");
+  const takeover = pluginCanTakeOver(plugin) && !pluginEligible(plugin) && (!plugin.ownership?.intent || plugin.ownership.intent.state === "released");
   const key = JSON.stringify([plugin.folder, plugin.repo]);
   const cached = useViewState().bindingDraft;
   const form = cached.key === key ? cached : createBindingDraft(plugin);

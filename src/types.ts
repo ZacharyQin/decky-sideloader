@@ -6,8 +6,9 @@ export type OwnershipIntent = { id: string; name: string; folder: string; repo: 
 export type PluginOwnership = { state: "unknown" | "readonly" | "pending" | "store" | "owned" | "nonstore" | "repair"; eligible: boolean; intent: OwnershipIntent | null; error: string | null };
 export type PluginRow = {
   ownership?: PluginOwnership;
-  name: string; folder: string | null; version: string | null; author: string;
-  repo: string | null; repo_source: "user" | "package.json" | "disabled" | null;
+  name: string; folder: string | null; version: string | null; author: string; package_name?: string | null;
+  repo: string | null; repo_source: "user" | "package.json" | "remembered" | "disabled" | null;
+  memory_in_store?: boolean | null; memory_changed?: boolean;
   registration?: "registered" | "unknown"; cached_in_store?: boolean | null;
   management?: { state: "enabled" | "disabled" | "unregistered" | "ambiguous" | "unknown"; version: string | null; loadType: number | null; versionMismatch: boolean };
   is_self: boolean; in_store: boolean | null; sideload: boolean;
@@ -40,7 +41,7 @@ export type NetworkMode = "direct" | "auto" | "gh-proxy";
 export type NetworkRoute = "direct" | "gh-proxy";
 export type AppSettings = {
   networkMode?: NetworkMode; lastNetworkRoute?: { route: NetworkRoute; timestamp: number } | null;
-  bindings: Record<string, { repo?: string; overridden?: boolean; disabled?: boolean }>;
+  bindings: Record<string, { repo?: string; overridden?: boolean; disabled?: boolean; folder?: string; package_name?: string | null; package_repo?: string | null }>;
   checkNotifications?: boolean; lastScheduledCheck?: CheckReport | null;
   autoCheck: boolean; autoCheckMinutes: number; lastCheck: CheckReport | null;
 };

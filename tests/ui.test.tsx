@@ -51,7 +51,7 @@ const api = {
   stopDiagnosticsShare: mock(async (session: string): Promise<DiagnosticShare> => ({ state: "stopped", session })),
   probeRepository: mock(async () => probe),
   searchRepositories: mock(async () => repositories),
-  listSideloadPlugins: mock(async () => listing), listReleases: mock(async () => releases), checkUpdates: mock(async () => listing),
+  listSideloadPlugins: mock(async (_refresh?: boolean) => listing), listReleases: mock(async () => releases), checkUpdates: mock(async () => listing),
   getAppSettings: mock(async () => settings), setCheckNotifications: mock(async () => settings), setAutoCheck: mock(async () => settings), setNetworkMode: mock(async () => settings),
   setBinding: mock(async () => ({ name: "Example", repo: "acme/example" })), clearBinding: mock(async () => undefined),
   getOperation: mock(async () => operation), prepareInstall: mock(async () => operation!),
@@ -224,7 +224,8 @@ test("home rows are single focus targets with a preferred return location", asyn
 test("store failure is not rendered as an empty plugin list", async () => {
   listing = { plugins: [], store_ok: false, store_error: "offline", last_check: null };
   const root = await mount(<Home selected={null} onOpen={() => {}} onInstall={() => {}} onSettings={() => {}} />);
-  expect(text(root)).toContain("来源识别失败");
+  expect(text(root)).not.toContain("来源识别失败");
+  expect(root.root.findAllByType("DialogButton").filter((b) => b.props["data-action-key"] === "refreshTask")).toHaveLength(1);
   expect(text(root)).not.toContain("尚无可管理的插件");
 });
 
@@ -708,27 +709,28 @@ test("source fallback shows unknown plugins directly and distinguishes registrat
     catalog: { source: "registry", timestamp: 1000, stale: false, warning: "store timeout" } };
   const root = await mount(<Home selected={null} onOpen={() => {}} onInstall={() => {}} onSettings={() => {}} />);
   expect(root.root.findAllByType("Field").some((field) => field.props.label === "Example")).toBe(true);
-  expect(text(root)).toContain("官方仓库登记辅助");
-  expect(text(root)).toContain("登记不等于当前商店收录");
-  expect(text(root)).toContain("官方数据库已登记");
-  expect(buttons(root).some((b) => b.props.children === "重试来源识别")).toBe(true);
+  expect(text(root)).not.toContain("官方仓库登记辅助");
+  expect(text(root)).not.toContain("登记不等于当前商店收录");
+  expect(text(root)).not.toContain("官方数据库已登记");
+  expect(root.root.findAllByType("DialogButton").filter((b) => b.props["data-action-key"] === "refreshTask")).toHaveLength(1);
 });
 
 test("stale catalog warns without claiming current store membership", async () => {
   listing = { plugins: [{ ...plugin, in_store: null, cached_in_store: true }], store_ok: false, store_error: "offline", last_check: null,
     catalog: { source: "cache", timestamp: 1000, stale: true, warning: "offline" } };
   const root = await mount(<Home selected={null} onOpen={() => {}} onInstall={() => {}} onSettings={() => {}} />);
-  expect(text(root)).toContain("过期商店缓存");
-  expect(text(root)).toContain("当前商店收录情况未知");
+  expect(text(root)).not.toContain("过期商店缓存");
+  expect(text(root)).not.toContain("当前商店收录情况未知");
+  expect(text(root)).not.toContain("目录时间");
 });
 
 test("unavailable catalog keeps unknown plugins visible and exposes source retry", async () => {
   listing = { plugins: [{ ...plugin, sideload: false, repo_source: "package.json", in_store: null }], store_ok: false, store_error: "both offline", last_check: null,
     catalog: { source: "unavailable", timestamp: null, stale: false, warning: "both offline" } };
   const root = await mount(<Home selected={null} onOpen={() => {}} onInstall={() => {}} onSettings={() => {}} />);
-  expect(text(root)).toContain("来源：完全不可用");
-  expect(text(root)).toContain("商店来源未知");
-  const retry = buttons(root).find((b) => b.props.children === "重试来源识别")!;
+  expect(text(root)).not.toContain("来源：完全不可用");
+  expect(text(root)).not.toContain("商店来源未知");
+  const retry = buttons(root).find((b) => b.props["data-action-key"] === "refreshTask")!;
   expect(retry).toBeTruthy();
   api.listSideloadPlugins.mockClear();
   await act(async () => retry.props.onClick());
@@ -1264,7 +1266,7 @@ test("unknown task navigation remains secondary and never resubmits or closes th
   await act(async () => controller.refreshOperation());
   const definition = makePlugin(); stop = definition.onDismount!;
   const root = await mount(definition.content!);
-  expect(root.root.findAllByType("DialogButton").map((node) => node.props["data-action-key"])).toEqual(["checkUpdates"]);
+  expect(root.root.findAllByType("DialogButton").filter((node) => node.props.style?.width === "100%").map((node) => node.props["data-action-key"])).toEqual(["checkUpdates"]);
   const row = root.root.findAllByType("Field").find((node) => node.props["data-action-key"] === "viewTask")!;
   expect(row.props.focusable).toBe(true);
   expect(row.findAllByType("DialogButton")).toHaveLength(0);
@@ -1280,7 +1282,7 @@ test("unknown task navigation remains secondary and never resubmits or closes th
 test("home has one primary button and single-focus guarded secondary actions", async () => {
   const install = mock(), settingsClick = mock();
   const root = await mount(<Home selected={null} onOpen={() => {}} onInstall={install} onSettings={settingsClick} />);
-  expect(root.root.findAllByType("DialogButton").map((node) => node.props["data-action-key"])).toEqual(["checkUpdates"]);
+  expect(root.root.findAllByType("DialogButton").filter((node) => node.props.style?.width === "100%").map((node) => node.props["data-action-key"])).toEqual(["checkUpdates"]);
   for (const key of ["newInstall", "settings", "takeover"]) {
     const row = root.root.findAllByType("Field").find((node) => node.props["data-action-key"] === key)!;
     expect(row.props.focusable).toBe(true);
@@ -1435,8 +1437,9 @@ test("source retry publishes independent busy state, deduplicates clicks and sur
   let current = root.root.findAllByType("DialogButton").find((node) => node.props["data-action-key"] === "refreshTask")!;
   expect(current.props["aria-busy"]).toBe(true);
   expect(current.props.disabled).toBe(true);
-  expect(current.props["aria-label"]).toBe("正在识别来源…");
+  expect(current.props["aria-label"]).toBe("刷新列表");
   expect(api.listSideloadPlugins).toHaveBeenCalledTimes(1);
+  expect(api.listSideloadPlugins.mock.calls[0]).toEqual([true]);
   expect(api.checkUpdates).not.toHaveBeenCalled();
   expect(buttons(root).find((button) => button.props["data-action-key"] === "checkUpdates")!.props["aria-busy"]).toBe(false);
   await unmount(root); root = await mount(element);
@@ -1447,8 +1450,8 @@ test("source retry publishes independent busy state, deduplicates clicks and sur
   current = root.root.findAllByType("DialogButton").find((node) => node.props["data-action-key"] === "refreshTask")!;
   expect(current.props["aria-busy"]).toBe(false);
   expect(current.props.disabled).toBe(false);
-  expect(current.props["aria-label"]).toBe("重试来源识别");
-  expect(text(root)).toContain("store offline");
+  expect(current.props["aria-label"]).toBe("刷新列表");
+  expect(text(root)).not.toContain("store offline");
 });
 
 test("source read failure is labelled separately and a successful retry preserves check failure", async () => {
@@ -1457,15 +1460,15 @@ test("source read failure is labelled separately and a successful retry preserve
   api.checkUpdates.mockRejectedValueOnce(new Error("check failure retained"));
   await act(async () => checks.runCheck());
   api.listSideloadPlugins.mockRejectedValueOnce(new Error("source RPC timeout"));
-  await act(async () => checks.refreshPlugins());
-  expect(text(root)).toContain("来源读取失败");
+  await act(async () => checks.refreshPlugins(true));
+  expect(text(root)).toContain("刷新失败");
   expect(text(root)).toContain("source RPC timeout");
   expect(text(root)).toContain("check failure retained");
   expect(root.root.findAllByType("DialogButton").find((node) => node.props["data-action-key"] === "refreshTask")!.props.disabled).toBe(false);
-  await act(async () => checks.refreshPlugins());
-  expect(text(root)).not.toContain("来源读取失败");
+  await act(async () => checks.refreshPlugins(true));
+  expect(text(root)).not.toContain("刷新失败");
   expect(text(root)).not.toContain("source RPC timeout");
-  expect(root.root.findAllByType("DialogButton").filter((node) => node.props["data-action-key"] === "refreshTask")).toHaveLength(0);
+  expect(root.root.findAllByType("DialogButton").filter((node) => node.props["data-action-key"] === "refreshTask")).toHaveLength(1);
   expect(text(root)).toContain("检查失败");
   expect(text(root)).toContain("check failure retained");
 });
@@ -1478,16 +1481,16 @@ test("source refresh waiting for a check stays busy until its queued list read f
   api.checkUpdates.mockImplementationOnce(() => new Promise<PluginListResponse>((resolve) => { finishCheck = resolve; }));
   api.listSideloadPlugins.mockImplementationOnce(() => new Promise<PluginListResponse>((resolve) => { finishRead = resolve; }));
   let check!: Promise<void>, refresh!: Promise<void>;
-  await act(async () => { check = checks.runCheck(); refresh = checks.refreshPlugins(); });
+  await act(async () => { check = checks.runCheck(); refresh = checks.refreshPlugins(true); });
   expect(api.listSideloadPlugins).not.toHaveBeenCalled();
-  expect(text(root)).toContain("等待检查完成…");
+  expect(root.root.findAllByType("DialogButton").find((node) => node.props["data-action-key"] === "refreshTask")!.props["aria-busy"]).toBe(true);
   await act(async () => { finishCheck(listing); await check; });
   expect(api.listSideloadPlugins).toHaveBeenCalledTimes(1);
-  expect(text(root)).toContain("正在识别来源…");
+  expect(api.listSideloadPlugins.mock.calls[0]).toEqual([true]);
   expect(root.root.findAllByType("DialogButton").find((node) => node.props["data-action-key"] === "refreshTask")!.props["aria-busy"]).toBe(true);
   await act(async () => { finishRead(listing); await refresh; });
   expect(root.root.findAllByType("DialogButton").find((node) => node.props["data-action-key"] === "refreshTask")!.props["aria-busy"]).toBe(false);
-  expect(text(root)).toContain("重试来源识别");
+  expect(root.root.findAllByType("DialogButton").find((node) => node.props["data-action-key"] === "refreshTask")!.props["aria-label"]).toBe("刷新列表");
 });
 
 function installEventBus() {
@@ -2572,4 +2575,48 @@ test("task52 old rendered task actions cannot cancel, dispatch or close a newer 
   expect(api.submitPrepared).not.toHaveBeenCalled();
   expect(api.closeOperation).not.toHaveBeenCalled();
   expect(loaderCall).not.toHaveBeenCalled();
+});
+
+
+test("task53 ordinary mount, QAM remount and update check do not request source refresh", async () => {
+  const element = <Home selected={null} onOpen={() => {}} onInstall={() => {}} onSettings={() => {}} />;
+  let root = await mount(element);
+  await unmount(root); root = await mount(element);
+  await act(async () => checks.runCheck());
+  expect(api.listSideloadPlugins.mock.calls.every((args) => args[0] !== true)).toBe(true);
+  const refresh = root.root.findAllByType("DialogButton").filter((b) => b.props["data-action-key"] === "refreshTask");
+  expect(refresh).toHaveLength(1);
+  expect(refresh[0]!.props["aria-label"]).toBe("刷新列表");
+  expect(refresh[0]!.props.style.width).toBe("auto");
+  expect(refresh[0]!.findAllByType("span")).toHaveLength(0);
+  api.listSideloadPlugins.mockClear();
+  await act(async () => refresh[0]!.props.onClick());
+  expect(api.listSideloadPlugins.mock.calls).toEqual([[true]]);
+});
+
+test("task53 remembered store responsibility stays hidden by default and has explicit takeover", async () => {
+  const stored: PluginRow = { ...plugin, in_store:null, cached_in_store:true, sideload:false,
+    ownership:{state:"store",eligible:false,intent:null,error:null} };
+  listing = {...listing,plugins:[stored],store_ok:false,catalog:{source:"cache",timestamp:1000,stale:true,warning:"offline"}};
+  const home = await mount(<Home selected={null} onOpen={() => {}} onInstall={() => {}} onSettings={() => {}} />);
+  const toggle = home.root.findAllByType("Field").find((f) => f.props["data-action-key"] === "takeover")!;
+  if (toggle.props["aria-label"] === "收起商店插件") await act(async () => toggle.props.onActivate());
+  expect(home.root.findAllByType("Field").some((f) => f.props.label === "Example")).toBe(false);
+  expect(text(home)).not.toMatch(/来源|缓存|目录时间|offline/);
+  const detail = await mount(<InstalledTab plugin={stored} onBinding={() => {}} onOperation={() => {}} />);
+  expect(buttons(detail).some((b) => b.props["data-action-key"] === "takeover")).toBe(true);
+  expect(api.listReleases).not.toHaveBeenCalled();
+  const editor = await mount(<BindingEditor plugin={stored} onSaved={() => {}} />);
+  expect(text(editor)).toContain("接管");
+  expect(api.beginStoreOwnership).not.toHaveBeenCalled();
+  expect(api.setBinding).not.toHaveBeenCalled();
+});
+
+test("task53 remembered nonstore management remains usable without source warnings", async () => {
+  listing = {...listing,plugins:[{...plugin,in_store:null,repo_source:"remembered",memory_in_store:false,
+    ownership:{state:"nonstore",eligible:true,intent:null,error:null}}],store_ok:false,
+    catalog:{source:"cache",timestamp:1000,stale:true,warning:"offline"}};
+  const root = await mount(<Home selected={null} onOpen={() => {}} onInstall={() => {}} onSettings={() => {}} />);
+  expect(root.root.findAllByType("Field").some((f) => f.props.label === "Example")).toBe(true);
+  expect(text(root)).not.toMatch(/商店来源|缓存|目录时间|offline/);
 });

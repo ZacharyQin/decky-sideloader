@@ -1,5 +1,5 @@
 // Semantic index:
-// - participant: docs/upstream-conflict/sideload/plugin-management.md -- share checks and list refresh state across QAM mounts while retaining generation isolation and separate errors.
+// - participant: docs/upstream-conflict/sideload/plugin-management.md -- separate local reads and single explicit source refresh intents across QAM with generation and error isolation.
 import { useSyncExternalStore } from "react";
 import { checkUpdates, listSideloadPlugins } from "./api";
 import { errorText } from "./components";
@@ -13,6 +13,8 @@ let state: CheckState = { list: null, checking: false, refreshing: false, error:
 let pending: Promise<void> | null = null;
 let refreshPending: Promise<void> | null = null;
 let refreshRequested = false;
+let sourceRefreshRequested = false;
+let sourceRefreshInFlight = false;
 let generation = 0;
 const listeners = new Set<() => void>();
 const publish = (changes: Partial<CheckState>) => {
@@ -22,9 +24,13 @@ const publish = (changes: Partial<CheckState>) => {
 };
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const useChecks = () => useSyncExternalStore(subscribe, () => state, () => state);
-export function refreshPlugins(): Promise<void> {
-  // Remounts share the queued/in-flight read. A new check invalidates a read
-  // already in flight, so requests during that check require one later read.
+export function refreshPlugins(sources = false): Promise<void> {
+  // Ordinary reads never refresh the store. Only a user's source-refresh
+  // intent is queued, consumed once, and coalesced across QAM mounts.
+  if (sources && !sourceRefreshInFlight) {
+    sourceRefreshRequested = true;
+    refreshRequested = true;
+  }
   if (refreshPending) {
     if (pending) refreshRequested = true;
     return refreshPending;
@@ -35,13 +41,16 @@ export function refreshPlugins(): Promise<void> {
       while (refreshRequested) {
         while (pending) await pending;
         refreshRequested = false;
+        const sources = sourceRefreshRequested;
+        sourceRefreshRequested = false;
+        sourceRefreshInFlight = sources;
         const request = ++generation;
         try {
-          const list = await listSideloadPlugins();
+          const list = await (sources ? listSideloadPlugins(true) : listSideloadPlugins());
           if (request === generation) publish({ list, listError: null });
         } catch (error) {
           if (request === generation) publish({ listError: errorText(error) });
-        }
+        } finally { sourceRefreshInFlight = false; }
       }
     } finally { refreshPending = null; publish({ refreshing: false }); }
   });

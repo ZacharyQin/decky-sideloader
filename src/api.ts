@@ -7,13 +7,13 @@ import { readLoaderPlugins } from "./loaderBridge";
 import { callable } from "@decky/api";
 import type { AppSettings, InstallOperation, PluginListResponse, ReleaseRow, RepositoryRow, RepositoryProbe, NetworkMode, DiagnosticEvent, DiagnosticStatus, DiagnosticShare, OwnershipIntent } from "./types";
 
-const readDiskPlugins = callable<[], PluginListResponse>("list_sideload_plugins");
+const readDiskPlugins = callable<[refresh?: boolean], PluginListResponse>("list_sideload_plugins");
 const checkDiskUpdates = callable<[], PluginListResponse>("check_updates");
 async function withLoader(read: () => Promise<PluginListResponse>): Promise<PluginListResponse> {
   const list = await read(); // Preserve backend RPC rejection; Loader failure is independent.
   return mergeLoaderPlugins(list, await readLoaderPlugins());
 }
-export const listSideloadPlugins = () => withLoader(readDiskPlugins);
+export const listSideloadPlugins = (refresh = false) => withLoader(() => refresh ? readDiskPlugins(true) : readDiskPlugins());
 export const getAppSettings = callable<[], AppSettings>("get_app_settings");
 export const setNetworkMode = callable<[mode: NetworkMode], AppSettings>("set_network_mode");
 export const setCheckNotifications = callable<[enabled: boolean], AppSettings>("set_check_notifications");

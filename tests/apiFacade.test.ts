@@ -109,3 +109,18 @@ test("task52 legacy backend diagnostic errors use download wording without chang
   const run = spawnSync(process.execPath, ["-e", script], { cwd: process.cwd(), encoding: "utf8" });
   expect(run.stderr).toBe(""); expect(run.status).toBe(0);
 });
+
+
+test("task53 only explicit source refresh passes true to the backend", () => {
+  const script = `
+    import {mock} from 'bun:test';
+    const calls=[];
+    mock.module('@decky/api',()=>({callable:(name)=>async(...args)=>{calls.push([name,...args]);return {plugins:[],store_ok:false,store_error:null,last_check:null}}}));
+    globalThis.window={DeckyBackend:{call:async()=>[]}};
+    const api=await import('./src/api.ts');
+    await api.listSideloadPlugins();await api.listSideloadPlugins(true);await api.checkUpdates();
+    if(JSON.stringify(calls)!==JSON.stringify([['list_sideload_plugins'],['list_sideload_plugins',true],['check_updates']]))throw Error('implicit source refresh');
+  `;
+  const run=spawnSync(process.execPath,['-e',script],{cwd:process.cwd(),encoding:'utf8'});
+  expect(run.stderr).toBe('');expect(run.status).toBe(0);
+});

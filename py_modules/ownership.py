@@ -104,6 +104,8 @@ class Ownership:
                 state = "readonly"
             elif error:
                 state = "unknown"
+            elif row.get("memory_changed"):
+                state = "unknown"
             elif entry and entry["state"] not in ("active", "released"):
                 state = "pending"
             elif entry and entry["state"] == "released":
@@ -112,13 +114,15 @@ class Ownership:
                 state = "owned" if frozen is not None and row["name"] in frozen else "pending"
                 eligible = state == "owned"
                 row["repo"], row["repo_source"] = entry["repo"], "user"
-            elif row.get("in_store") is True or row.get("cached_in_store") is True:
+            elif row.get("memory_error"):
+                state = "unknown"
+            elif row.get("in_store") is True or row.get("cached_in_store") is True or row.get("memory_in_store") is True:
                 state = "store"
-            elif row.get("in_store") is False:
+            elif row.get("in_store") is False or row.get("memory_in_store") is False:
                 state, eligible = "nonstore", True
             elif row.get("repo_source") == "user" and parse_github_input(row.get("repo") or ""):
                 state, eligible = "repair", True
-            row["ownership"] = {"state": state, "eligible": eligible, "intent": copy.deepcopy(entry), "error": error}
+            row["ownership"] = {"state": state, "eligible": eligible, "intent": copy.deepcopy(entry), "error": error or row.get("memory_error")}
             row["sideload"] = eligible
             rows.append(row)
         return rows
@@ -131,8 +135,8 @@ class Ownership:
         if action == "return":
             if not old or old["state"] != "active":
                 raise RuntimeError("此插件没有可交还的接管记录")
-        elif action != "takeover" or plugin.get("in_store") is not True:
-            raise RuntimeError("只有当前商店已收录的插件可以显式接管")
+        elif action != "takeover" or not (plugin.get("in_store") is True or plugin.get("cached_in_store") is True or plugin.get("memory_in_store") is True):
+            raise RuntimeError("此插件没有已确认的商店记录，不能接管")
         if action == "takeover" and old and old["state"] == "active":
             raise RuntimeError("此插件已经接管")
         parsed = parse_github_input(repo) if isinstance(repo, str) else None

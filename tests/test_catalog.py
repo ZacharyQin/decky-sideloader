@@ -35,7 +35,7 @@ class CatalogTests(unittest.TestCase):
         self.catalog = Catalog(self.path, self.store, self.registry, lambda: self.now)
 
     def test_live_then_fresh_cache_avoids_store_request_and_records_time(self):
-        names, status, _ = self.catalog.resolve()
+        names, status, _ = self.catalog.resolve(refresh=True)
         self.assertEqual(status, {"source": "live", "timestamp": 1000, "stale": False, "warning": None})
         self.now += 10
         self.assertEqual(self.catalog.resolve()[1]["source"], "cache")
@@ -45,11 +45,11 @@ class CatalogTests(unittest.TestCase):
         self.store.assert_called_once()
 
     def test_expired_success_cache_is_explicit_and_failure_does_not_replace_snapshot(self):
-        self.catalog.resolve()
+        self.catalog.resolve(refresh=True)
         before = self.path.read_bytes()
         self.now += 301
         self.store.return_value = (set(), "timeout")
-        names, status, _ = self.catalog.resolve()
+        names, status, _ = self.catalog.resolve(refresh=True)
         self.assertEqual(names, {"中文 插件", "Example"})
         self.assertEqual(status["source"], "cache")
         self.assertTrue(status["stale"])
@@ -59,7 +59,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_timeout_uses_registration_not_store_membership_and_does_not_guess_aliases(self):
         self.store.return_value = (set(), "timeout")
-        names, status, entries = self.catalog.resolve()
+        names, status, entries = self.catalog.resolve(refresh=True)
         self.assertEqual(names, set())
         self.assertEqual(status["source"], "registry")
         self.assertFalse(self.path.exists())
@@ -82,13 +82,13 @@ class CatalogTests(unittest.TestCase):
                 validate_names(payload)
         self.store.return_value = (set(), "invalid payload")
         self.registry.return_value = '[submodule "plugins/test"]\n path = plugins/test\n'
-        _, status, entries = self.catalog.resolve()
+        _, status, entries = self.catalog.resolve(refresh=True)
         self.assertEqual(status["source"], "unavailable")
         self.assertIn("不完整", status["warning"])
         self.assertEqual(entries, [])
         self.assertFalse(self.path.exists())
 
-    def test_corrupt_future_overage_and_oversized_cache_are_ignored(self):
+    def test_corrupt_future_invalid_timestamp_and_oversized_cache_are_ignored(self):
         for value in ("bad JSON", json.dumps({"names": ["Valid", None], "timestamp": 999}), json.dumps({"names": ["Valid"], "timestamp": 1001}), json.dumps({"names": ["Valid"], "timestamp": -9999999})):
             self.path.write_text(value)
             loaded = Catalog(self.path, self.store, self.registry, lambda: self.now)
@@ -97,10 +97,12 @@ class CatalogTests(unittest.TestCase):
         with patch.object(catalog, "MAX_CATALOG_BYTES", 1):
             self.assertIsNone(Catalog(self.path, self.store, self.registry, lambda: self.now).store)
 
-    def test_cache_past_max_age_uses_registry_not_stale_membership(self):
-        self.catalog.resolve()
-        self.now += catalog.CACHE_MAX_AGE + 1
+    def test_old_success_snapshot_is_retained_without_claiming_current_membership(self):
+        self.catalog.resolve(refresh=True)
+        self.now += 8 * 86400
         self.store.return_value = (set(), "offline")
-        names, status, _ = self.catalog.resolve()
-        self.assertEqual(names, set())
-        self.assertEqual(status["source"], "registry")
+        names, status, _ = self.catalog.resolve(refresh=True)
+        self.assertEqual(names, {"中文 插件", "Example"})
+        self.assertEqual(status["source"], "cache")
+        self.assertTrue(status["stale"])
+        self.registry.assert_not_called()

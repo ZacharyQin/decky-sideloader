@@ -296,34 +296,71 @@ class Plugin:
         save_settings(_settings_path(), settings)
         return settings
 
+    def _catalog_service(self):
+        if not hasattr(self, "_catalog"):
+            self._catalog = Catalog(Path(_settings_path()).with_name("catalog.json"),
+                                    lambda: _fetch_store_names(STORE_URL), lambda: "")
+        return self._catalog
+
     @_observed_rpc
-    async def list_sideload_plugins(self) -> dict:
+    async def list_sideload_plugins(self, refresh: bool = False) -> dict:
+        if type(refresh) is not bool:
+            raise RuntimeError("刷新参数无效")
+        if refresh:
+            async with self._ownership_lock():
+                self._require_binding_idle(decky.DECKY_PLUGIN_NAME)
+                operation = getattr(getattr(self, "_flow", None), "operation", None)
+                if operation and operation["stage"] not in ("failed", "closed", "cancelled"):
+                    raise RuntimeError("任务进行中，请结束后刷新")
+                return await self._list_plugins(True)
+        return await self._list_plugins(False)
+
+    async def _list_plugins(self, refresh: bool) -> dict:
         plugins_dir = os.path.join(decky.DECKY_HOME, "plugins")
         local = await asyncio.to_thread(read_plugins_dir, plugins_dir)
         if not hasattr(self, "_catalog_lock"):
             self._catalog_lock = asyncio.Lock()
         async with self._catalog_lock:
-            if not hasattr(self, "_catalog"):
-                self._catalog = Catalog(Path(_settings_path()).with_name("catalog.json"),
-                                        lambda: _fetch_store_names(STORE_URL), lambda: "")
-            transport = self._transport()
-            self._catalog.fetch_registry = lambda: transport.fetch_bytes(REGISTRY_URL, max_bytes=1024 * 1024, timeout=3, deadline=8).decode("utf-8")
-            store_names, catalog, entries = await asyncio.to_thread(self._catalog.resolve)
-        store_ok = catalog["source"] == "live" or catalog["source"] == "cache" and not catalog["stale"]
+            if refresh and getattr(self, "_catalog_closing", False):
+                raise RuntimeError("插件正在停止，请重新打开后重试")
+            service = self._catalog_service()
+            if refresh:
+                transport = self._transport()
+                service.fetch_registry = lambda: transport.fetch_bytes(REGISTRY_URL, max_bytes=1024 * 1024, timeout=3, deadline=8).decode("utf-8")
+                observed = [p for p in local if p["name"] != decky.DECKY_PLUGIN_NAME]
+                self._catalog_worker = asyncio.create_task(asyncio.to_thread(service.resolve, refresh=True, plugins=observed))
+                try:
+                    store_names, catalog, entries = await asyncio.shield(self._catalog_worker)
+                except asyncio.CancelledError:
+                    await self._catalog_worker
+                    raise
+                finally:
+                    self._catalog_worker = None
+                if catalog["warning"]:
+                    raise RuntimeError("刷新失败，请稍后重试")
+            else:
+                store_names, catalog, entries = await asyncio.to_thread(service.resolve)
+            memories = {}
+            for plugin in local:
+                memory = service.memory_for(plugin)
+                memories[plugin["folder"]] = memory if isinstance(memory, dict) else {}
+            history = getattr(service, "store_history", set())
+            history = history if isinstance(history, set) else store_names if catalog["source"] in ("live", "cache") else set()
+            memory_error = getattr(service, "memory_error", None)
+            memory_error = memory_error if isinstance(memory_error, str) else None
+        store_ok = catalog["source"] == "live"
         store_error = catalog["warning"]
-        if store_error:
-            decky.logger.warning("store list failed: %s", store_error)
         settings = load_settings(_settings_path())
-        plugins = classify_plugins(
-            local,
-            store_names,
-            decky.DECKY_PLUGIN_NAME,
-            store_ok=store_ok,
-        )
-        plugins = apply_bindings(plugins, settings.get("bindings", {}))
+        plugins = apply_bindings(classify_plugins(local, store_names, decky.DECKY_PLUGIN_NAME, store_ok=store_ok), settings.get("bindings", {}))
         for plugin in plugins:
+            memory = memories[plugin["folder"]]
             plugin["registration"] = registration_for(plugin, entries)
-            plugin["cached_in_store"] = plugin["name"] in store_names if catalog["source"] == "cache" and catalog["stale"] else None
+            plugin["cached_in_store"] = plugin["name"] in history
+            plugin["memory_in_store"] = memory.get("in_store")
+            plugin["memory_changed"] = bool(plugin.get("binding_changed") or memory.get("changed", False) and not plugin.get("binding_confirmed"))
+            plugin["memory_error"] = memory_error
+            if plugin["repo_source"] is None and memory.get("repo"):
+                plugin["repo"], plugin["repo_source"] = memory["repo"], "remembered"
         ownership = self._ownership()
         try:
             ledger, ownership_error = ownership.load(), None
@@ -382,7 +419,14 @@ class Plugin:
                 raise RuntimeError("插件目录已变化")
             listing = await self.list_sideload_plugins()
             plugin = next(p for p in listing["plugins"] if p["name"] == name)
-            return self._ownership().begin(plugin, repo, action, read_frozen(decky.DECKY_HOME))
+            self._require_binding_idle(name)
+            intent = self._ownership().begin(plugin, repo, action, read_frozen(decky.DECKY_HOME))
+            async with self._catalog_lock:
+                self._require_binding_idle(name)
+                service = self._catalog_service()
+                if isinstance(service, Catalog):
+                    service.remember(disk, intent["repo"], "user")
+            return intent
 
     async def ownership_native_step(self, identifier: str, phase: str) -> dict:
         async with self._ownership_lock():
@@ -447,6 +491,8 @@ class Plugin:
         return matches[0]
 
     def _require_binding_idle(self, name: str) -> None:
+        if getattr(self, "_catalog_closing", False):
+            raise RuntimeError("插件正在停止，请重新打开后重试")
         if not hasattr(self, "_flow") and getattr(decky, "DECKY_PLUGIN_RUNTIME_DIR", None):
             if (Path(decky.DECKY_PLUGIN_RUNTIME_DIR) / "installations" / "operation.json").is_file():
                 self._install_flow()
@@ -469,7 +515,10 @@ class Plugin:
             raise RuntimeError("GitHub 链接无效")
         settings = load_settings(_settings_path())
         bindings = settings.setdefault("bindings", {})
-        bindings[name] = {"repo": parsed, "overridden": True}
+        raw = self._require_plugin(name)
+        self._require_binding_idle(name)
+        bindings[name] = {"repo": parsed, "overridden": True, "folder": raw["folder"],
+                          "package_name": raw.get("package_name"), "package_repo": raw.get("repo")}
         save_settings(_settings_path(), settings)
         return {"name": name, "repo": parsed}
 
@@ -484,6 +533,7 @@ class Plugin:
         if plugin["ownership"]["state"] == "owned":
             raise RuntimeError("请使用交还商店，避免解除关联后商店仍暂停检查")
         settings = load_settings(_settings_path())
+        self._require_binding_idle(name)
         settings["bindings"][name] = {"disabled": True}
         save_settings(_settings_path(), settings)
 
@@ -630,7 +680,14 @@ class Plugin:
         flow = self._install_flow()
         def finalize(operation):
             settings = load_settings(_settings_path())
-            settings["bindings"][operation["package"]["name"]] = {"repo": operation["repo"], "overridden": True}
+            binding = {"repo": operation["repo"], "overridden": True}
+            home = getattr(decky, "DECKY_HOME", "")
+            rows = read_plugins_dir(os.path.join(home, "plugins")) if home else []
+            matches = [p for p in rows if p["name"] == operation["package"]["name"]]
+            if len(matches) == 1 and matches[0]["folder"] == operation["package"].get("folder"):
+                raw = matches[0]
+                binding.update(folder=raw["folder"], package_name=raw.get("package_name"), package_repo=raw.get("repo"))
+            settings["bindings"][operation["package"]["name"]] = binding
             save_settings(_settings_path(), settings)
         return await flow.status(finalize)
 
@@ -678,8 +735,12 @@ class Plugin:
         self._poll_task = asyncio.create_task(self._poll_loop())
 
     async def _unload(self):
+        self._catalog_closing = True
         if hasattr(self, "_sharing"):
             await self._sharing.stop(closing=True)
+        worker = getattr(self, "_catalog_worker", None)
+        if worker is not None:
+            await asyncio.shield(worker)
         self._diagnostic("shutdown")
         decky.logger.info("GitHub Sideload unloading")
         if hasattr(self, "_flow"):

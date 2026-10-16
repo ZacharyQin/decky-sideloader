@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # Semantic index:
-# - participant: docs/upstream-conflict/sideload/plugin-management.md -- distinguish unknown store membership from absent plugins.
+# - participant: docs/upstream-conflict/sideload/plugin-management.md -- expose package identity without treating unknown store membership as absent plugins.
 import json
 from pathlib import Path
 from typing import Any
@@ -65,6 +65,7 @@ def read_plugins_dir(plugins_dir: str) -> list[dict[str, Any]]:
                 "name": name,
                 "folder": child.name,
                 "version": version,
+                "package_name": package.get("name") if package and isinstance(package.get("name"), str) else None,
                 "author": plugin_json.get("author") if isinstance(plugin_json.get("author"), str) else "",
                 "repo": detect_github_repo(package),
             }

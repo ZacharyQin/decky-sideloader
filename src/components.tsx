@@ -11,11 +11,16 @@ const decorative = { "aria-hidden": true, focusable: "false" as const, size: "1e
 function BusyStyle() { return <style>{`@keyframes github-sideload-spin { to { transform: rotate(360deg); } }
       .github-sideload-spinning { transform-origin: center; animation: github-sideload-spin 1s linear infinite; }
       @media (prefers-reduced-motion: reduce) { .github-sideload-spinning { animation: none; } }`}</style>; }
-export function Action({ children, onClick, kind, disabled = false, loading = false, secondary = false }: {
-  children: ReactNode; onClick: () => void; kind: IconKey; disabled?: boolean; loading?: boolean; secondary?: boolean;
+export function Action({ children, onClick, kind, disabled = false, loading = false, secondary = false, iconOnly = false }: {
+  children: ReactNode; onClick: () => void; kind: IconKey; disabled?: boolean; loading?: boolean; secondary?: boolean; iconOnly?: boolean;
 }) {
   const Icon = loading ? FaSpinner : icons[kind];
   const label = Children.toArray(children).filter((part) => typeof part === "string" || typeof part === "number").join("");
+  if (iconOnly) return <DialogButton data-action-key={kind} aria-label={label} aria-busy={loading}
+    onOKActionDescription={label} disabled={disabled || loading} style={{ minWidth: 0, width: "auto", padding: "0.5em" }}
+    onClick={() => { if (!disabled && !loading) onClick(); }}>
+    {loading && <BusyStyle />}<Icon {...decorative} className={loading ? "github-sideload-spinning" : undefined} />
+  </DialogButton>;
   if (secondary) {
     const activate = () => { if (!disabled && !loading) onClick(); };
     return <PanelSectionRow>{loading && <BusyStyle />}<Field data-action-key={kind} aria-label={label} aria-busy={loading}
@@ -41,9 +46,9 @@ export function StatusText({ tone, children }: { tone: StatusTone; children: Rea
 }
 
 const statusIcons = { loading: FaSpinner, success: FaCheckCircle, warning: FaExclamationTriangle, error: FaExclamationCircle };
-export function Status({ title, children, tone, icon: Icon, iconClassName }: { title: string; children?: ReactNode; tone?: keyof typeof statusIcons; icon?: IconType; iconClassName?: string }) {
+export function Status({ title, children, tone, icon: Icon, iconClassName, action }: { title: string; children?: ReactNode; tone?: keyof typeof statusIcons; icon?: IconType; iconClassName?: string; action?: ReactNode }) {
   const Glyph = Icon ?? (tone ? statusIcons[tone] : null);
-  return <PanelSectionRow>{tone === "loading" && <BusyStyle />}<Field aria-busy={tone === "loading"} label={tone ? <StatusText tone={tone}>{title}</StatusText> : title} description={children} icon={Glyph ? <Glyph {...decorative} className={tone === "loading" ? "github-sideload-spinning" : iconClassName} /> : undefined} focusable={false} /></PanelSectionRow>;
+  return <PanelSectionRow>{tone === "loading" && <BusyStyle />}<Field aria-busy={tone === "loading"} label={tone ? <StatusText tone={tone}>{title}</StatusText> : title} description={children} icon={Glyph ? <Glyph {...decorative} className={tone === "loading" ? "github-sideload-spinning" : iconClassName} /> : undefined} focusable={false} childrenContainerWidth={action ? "min" : undefined}>{action}</Field></PanelSectionRow>;
 }
 
 export function errorText(error: unknown): string {

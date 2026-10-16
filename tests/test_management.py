@@ -41,6 +41,9 @@ class QueryContractTests(unittest.IsolatedAsyncioTestCase):
         self.registry.start()
         self.addCleanup(self.registry.stop)
         self.plugin = main.Plugin()
+        # Tests of release/notification contracts begin with an explicit source
+        # refresh; ordinary reads and update checks no longer fetch the store.
+        await self.plugin.list_sideload_plugins(True)
 
     async def test_poll_respects_auto_check_and_existing_last_check_interval(self):
         import asyncio
@@ -265,10 +268,12 @@ class QueryContractTests(unittest.IsolatedAsyncioTestCase):
         # catalog state rather than accidentally reusing its fresh success cache.
         self.plugin._catalog = main.Catalog(Path(main._settings_path()).with_name("offline-catalog.json"), lambda: (set(), "timeout"), lambda: "")
         with patch.object(main, "_fetch_store_names", return_value=(set(), "timeout")), patch.object(main.GitHubTransport, "fetch_bytes", return_value=b'[submodule "plugins/One"]\n path = plugins/One\n url = https://github.com/acme/One\n'):
+            with self.assertRaisesRegex(RuntimeError, "刷新失败"):
+                await self.plugin.list_sideload_plugins(True)
             listing = await self.plugin.list_sideload_plugins()
         self.assertFalse(listing["store_ok"])
         self.assertEqual(listing["catalog"]["source"], "registry")
-        self.assertIn("timeout", listing["store_error"])
+        self.assertIsNone(listing["store_error"])
         one = next(p for p in listing["plugins"] if p["name"] == "One")
         self.assertEqual(one["registration"], "registered")
         self.assertIsNone(one["in_store"])
