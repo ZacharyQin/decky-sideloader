@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mergeLoaderPlugins, pluginKey, pluginReadOnly, validateLoaderPlugins } from "../src/loaderManagement";
 import type { PluginListResponse, PluginRow } from "../src/types";
 const disk = (patch: Partial<PluginRow> = {}): PluginRow => ({ name: "Example", folder: "example", version: "1", author: "", repo: "acme/example", repo_source: "user", in_store: null, is_self: false, sideload: true, ...patch });
-const list = (...plugins: PluginRow[]): PluginListResponse => ({ plugins, store_ok: false, store_error: "timeout", last_check: null, catalog: { source: "cache", stale: true, timestamp: 1, warning: "stale" } });
+const list = (...plugins: PluginRow[]): PluginListResponse => ({ native_snapshot: { ok: true, plugins: [] }, plugins, store_ok: false, store_error: "timeout", last_check: null, catalog: { source: "cache", stale: true, timestamp: 1, warning: "stale" } });
 const native = (name = "Example", disabled = false) => ({ name, version: "2", disabled, load_type: 0 });
 test("unique Loader match preserves package version, explicit binding and stale store facts", () => {
   const result = mergeLoaderPlugins(list(disk()), { ok: true, plugins: [native()] });
@@ -11,7 +11,7 @@ test("unique Loader match preserves package version, explicit binding and stale 
   expect(result.store_error).toBe("timeout");
 });
 test("disabled, native-only, disk-only and self stay distinct", () => {
-  const result = mergeLoaderPlugins(list(disk({ repo_source: "disabled", repo: null })), { ok: true, plugins: [native("Native", true), native("Other"), native("GitHub Sideload")] });
+  const result = mergeLoaderPlugins(list(disk({ repo_source: "disabled", repo: null })), { ok: true, plugins: [native("Native", true), native("Other"), native("decky-sideloader")] });
   expect(result.plugins[0]).toMatchObject({ repo_source: "disabled", management: { state: "unregistered" } });
   expect(result.plugins[1]).toMatchObject({ folder: null, version: null, in_store: null, repo: null, management: { state: "disabled", version: "2" } });
   expect(pluginReadOnly(result.plugins[1])).toBe(true);

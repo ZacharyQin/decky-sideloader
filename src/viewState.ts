@@ -1,10 +1,8 @@
-// Semantic index:
-// - participant: docs/upstream-conflict/sideload/plugin-management.md -- retain popup drafts, diagnostics inner page and one-shot return focus across QAM.
 import { pluginKey } from "./loaderManagement";
 import { useSyncExternalStore } from "react";
 import type { AppSettings, NetworkMode, CheckReport, PluginRow, ReleaseRow, RepositoryRow, RepositoryProbe, UpdateInfo } from "./types";
 
-export type Page = "home" | "details" | "install" | "settings" | "binding" | "operation" | "checks" | "network" | "diagnostics";
+export type Page = "home" | "details" | "install" | "settings" | "binding" | "operation" | "checks" | "network" | "diagnostics" | "maintenance" | "versions" | "source" | "releaseNotes" | "licenses";
 type Selection = { tag: string | null; zip: string | null };
 export type BindingDraft = {
   key: string; value: string; query: string; mode: "search" | "manual";
@@ -17,18 +15,25 @@ export const createBindingDraft = (plugin?: PluginRow): BindingDraft => ({
   results: null, selected: null, request: 0, searching: false, busy: false, error: null,
 });
 export type InstallDraft = {
-  draft: string; mode: "manual" | "search"; query: string; repositories: RepositoryRow[] | null;
+  draft: string; repositories: RepositoryRow[] | null;
   repository: string | null; searching: boolean; probe: RepositoryProbe | null; pluginPath: string | null;
   releases: ReleaseRow[] | null; selection: Selection; busy: boolean; error: string | null; request: number;
 };
 type ViewState = {
   page: Page;
   plugin: PluginRow | null;
-  detailOrigin: "home" | "checks";
-  focusReturn: "home" | "checks" | null;
+  detailOrigin: "home" | "checks" | "source" | "install";
+  focusReturn: "home" | "checks" | "source" | "install" | null;
+  operationOrigin: "home" | "install" | "details";
+  bindingOrigin: "details" | "maintenance";
+  networkOrigin: "settings" | "details";
+  releaseNotes: { release: ReleaseRow; origin: "details" | "install" } | null;
+  releaseNotesFocus: boolean;
   settingsFocus: boolean;
   networkFocus: boolean;
   diagnosticsFocus: boolean;
+  licensesFocus: boolean;
+  licenses: { entry: string | null; document: number | null; focus: string | null; expanded: boolean };
   network: { settings: AppSettings | null; selection: NetworkMode | null; busy: boolean; request: number; error: string | null };
   checkReport: CheckReport | null;
   checkItem: UpdateInfo | null;
@@ -38,10 +43,13 @@ type ViewState = {
   bindingDraft: BindingDraft;
 };
 const initial = (): ViewState => ({
-  page: "home", plugin: null, focusReturn: null, detailOrigin: "home", settingsFocus: false, networkFocus: false, diagnosticsFocus: false,
+  page: "home", plugin: null, focusReturn: null, detailOrigin: "home", bindingOrigin: "details", networkOrigin: "settings", settingsFocus: false, networkFocus: false, diagnosticsFocus: false,
+  operationOrigin: "home",
+  releaseNotes: null, releaseNotesFocus: false,
+  licensesFocus: false, licenses: { entry: null, document: null, focus: null, expanded: false },
   network: { settings: null, selection: null, busy: false, request: 0, error: null },
   checkReport: null, checkItem: null, checkSelection: null,
-  install: { draft: "", mode: "manual", query: "", repositories: null, repository: null, searching: false,
+  install: { draft: "", repositories: null, repository: null, searching: false,
     probe: null, pluginPath: null, releases: null, selection: { tag: null, zip: null }, busy: false, error: null, request: 0 },
   detailSelection: { key: "", tag: null, zip: null },
   bindingDraft: createBindingDraft(),
@@ -56,4 +64,7 @@ export function updateViewState(update: (current: ViewState) => ViewState) {
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const useViewState = () => useSyncExternalStore(subscribe, getViewState, getViewState);
 export function resetViewState() { updateViewState(initial); }
-export function resetInstallView() { updateViewState((current) => ({ ...current, install: initial().install })); }
+export function returnToInstallSearch() {
+  updateViewState((current) => ({ ...current, page: "install", focusReturn: "install", install: { ...current.install,
+    probe: null, pluginPath: null, releases: null, selection: { tag: null, zip: null }, busy: false, searching: false, error: null, request: current.install.request + 1 } }));
+}

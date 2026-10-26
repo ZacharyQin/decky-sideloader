@@ -5,11 +5,11 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULES = ROOT / "py_modules"
+MODULES = ROOT / "backend"
 if str(MODULES) not in sys.path:
     sys.path.insert(0, str(MODULES))
 
-from scan import classify_plugins, detect_github_repo, read_plugins_dir
+from sideload.scan import classify_plugins, detect_github_repo, read_plugins_dir
 
 
 def _write_plugin(
@@ -67,19 +67,19 @@ class ScanTests(unittest.TestCase):
         local = [
             {"name": "PowerTools", "folder": "PowerTools", "version": "1.0.0", "author": "x", "repo": None},
             {"name": "Secret Zip", "folder": "secret-zip", "version": "0.4.0", "author": "y", "repo": "y/secret"},
-            {"name": "GitHub Sideload", "folder": "github-sideload", "version": "0.0.1", "author": "z", "repo": None},
+            {"name": "decky-sideloader", "folder": "decky-sideloader", "version": "0.0.1", "author": "z", "repo": None},
         ]
-        rows = classify_plugins(local, store_names={"PowerTools"}, self_name="GitHub Sideload")
+        rows = classify_plugins(local, store_names={"PowerTools"}, self_name="decky-sideloader")
         by_name = {r["name"]: r for r in rows}
 
         self.assertTrue(by_name["PowerTools"]["in_store"])
         self.assertFalse(by_name["PowerTools"]["sideload"])
         self.assertFalse(by_name["Secret Zip"]["in_store"])
         self.assertTrue(by_name["Secret Zip"]["sideload"])
-        self.assertTrue(by_name["GitHub Sideload"]["is_self"])
-        self.assertFalse(by_name["GitHub Sideload"]["sideload"])
+        self.assertTrue(by_name["decky-sideloader"]["is_self"])
+        self.assertFalse(by_name["decky-sideloader"]["sideload"])
 
-        unknown = classify_plugins(local, store_names=set(), self_name="GitHub Sideload", store_ok=False)
+        unknown = classify_plugins(local, store_names=set(), self_name="decky-sideloader", store_ok=False)
         self.assertIsNone(unknown[1]["in_store"])
         self.assertFalse(unknown[1]["sideload"])
 

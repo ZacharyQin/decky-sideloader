@@ -1,13 +1,15 @@
-// Semantic index:
-// - owner: docs/upstream-conflict/sideload/plugin-management.md -- own single confirmation and cancellation intents, isolate uninstall rechecks from install dispatch, and preserve evidence finalization.
+import { t } from "./i18n";
 import { useSyncExternalStore } from "react";
-import { claimUninstall, completeUninstall, cancelOperation, dismissOperation, closeOperation, getOperation, prepareInstall, recordInstallEvent, submitPrepared } from "./api";
-import { errorText } from "./components";
+import { claimUninstall, completeUninstall, cancelOperation, continuePrepared, dismissOperation, closeOperation, deleteInstallPackage, getOperation, prepareInstall, recordInstallEvent, retryDownload, submitPrepared } from "./api";
+import { errorText } from "./errors";
 import { cancelPendingInstall, confirmPrepareReinstall, confirmReinstall, uninstallForReinstall, InstallType, installFromArtifact, listenForInstallEvents, probeLoaderChannel, uninstallPlugin } from "./loaderBridge";
 import type { InstallOperation, PluginRow, ReleaseRow } from "./types";
 import { versionAction } from "./viewModel";
+import { refreshAfterPluginMutation } from "./checkController";
+import { createBindingDraft, getViewState, updateViewState } from "./viewState";
+import { toastError } from "./toast";
 
-let snapshot: { operation: InstallOperation | null; error: string | null; cancelling: boolean; dismissing: boolean } = { operation: null, error: null, cancelling: false, dismissing: false };
+let snapshot: { operation: InstallOperation | null; error: string | null; preparing: boolean; cancelling: boolean; dismissing: boolean } = { operation: null, error: null, preparing: false, cancelling: false, dismissing: false };
 const listeners = new Set<() => void>();
 let automatic: { id: string; type: InstallType } | null = null;
 let dispatching = false;
@@ -29,10 +31,11 @@ const publish = (operation: InstallOperation | null, error: string | null = null
     else {
       if (snapshot.operation.cancel_requested) operation = { ...operation, cancel_requested: true };
       if (snapshot.operation.notice_dismissed) operation = { ...operation, notice_dismissed: true };
+      if (snapshot.operation.artifact_deleted) operation = { ...operation, artifact_deleted: true };
     }
   }
   ++revision;
-  snapshot = { operation, error, cancelling: cancellingId === operation?.id, dismissing: dismissingId === operation?.id }; listeners.forEach((listener) => listener());
+  snapshot = { operation, error, preparing, cancelling: cancellingId === operation?.id, dismissing: dismissingId === operation?.id }; listeners.forEach((listener) => listener());
 };
 export function useInstallation() {
   return useSyncExternalStore((listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => snapshot);
@@ -119,16 +122,16 @@ export async function dispatchPrepared(type?: InstallType, identifier = snapshot
     const message = errorText(error);
     if (uninstallCheckPending && blocked.has(op.id)) {
       try { publishResult(await completeUninstall(op.id)); }
-      catch { publish(snapshot.operation, `${message}。卸载结果仍需回查，不会继续安装。`); }
+      catch { publish(snapshot.operation, t("{0}。卸载结果仍需回查，不会继续安装。", [message])); }
       return;
     }
     if (submitted?.package) {
       try { publishResult(await recordInstallEvent(op.id, uninstallClaimed && submitted.stage === "uninstalling" ? "uninstall_error" : "dispatch_error", submitted.package.name, message), message); }
-      catch { publishResult(submitted, `${message}。状态回写失败，请重新核对，勿重复安装。`); }
+      catch { publishResult(submitted, t("{0}。状态回写失败，请重新核对，勿重复安装。", [message])); }
     } else { publish(snapshot.operation, message); }
   } finally { if (currentGeneration === generation) dispatching = false; }
 }
-export async function startInstallation(release: ReleaseRow, zip: string, plugin: PluginRow | null, pluginPath?: string, mode: "install" | "reinstall" = "install"): Promise<boolean> {
+export async function startInstallation(release: ReleaseRow, zip: string, plugin: PluginRow | null, pluginPath?: string, mode: "install" | "reinstall" = "install", onPreparing?: () => void): Promise<boolean> {
   if (preparing || dispatching || uninstallIntent || mode === "reinstall" && isActive(snapshot.operation)) return false;
   const channel = probeLoaderChannel();
   if (!channel.ok) throw new Error(channel.reason);
@@ -137,6 +140,8 @@ export async function startInstallation(release: ReleaseRow, zip: string, plugin
   try {
     if (mode === "reinstall" && !await confirmPrepareReinstall(plugin!.name)) return false;
     if (currentGeneration !== generation || mode === "reinstall" && isActive(snapshot.operation)) return false;
+    publish(snapshot.operation);
+    onPreparing?.();
     const op = mode === "reinstall" ? await prepareInstall(release.repo, release.tag, zip, plugin?.name ?? null, null, mode)
       : pluginPath === undefined ? await prepareInstall(release.repo, release.tag, zip, plugin?.name ?? null)
       : await prepareInstall(release.repo, release.tag, zip, plugin?.name ?? null, pluginPath);
@@ -146,20 +151,26 @@ export async function startInstallation(release: ReleaseRow, zip: string, plugin
     initializeEvents = null;
     initialize?.(null);
     automatic = { id: op.id, type: versionAction(release, !!plugin).type };
+    preparing = false;
     publish(op);
     return true;
-  } finally { if (currentGeneration === generation) preparing = false; }
+  } catch (error) {
+    if (currentGeneration === generation) { preparing = false; publish(null, errorText(error)); }
+    throw error;
+  } finally {
+    if (currentGeneration === generation && preparing) { preparing = false; publish(snapshot.operation, snapshot.error); }
+  }
 }
 
 export const isDispatchBlocked = (identifier: string) => blocked.has(identifier);
 
 export function cancellationReason(op: InstallOperation): string | null {
-  if (["failed", "closed", "cancelled"].includes(op.stage)) return "任务已经结束";
-  if (op.stage === "installing" || op.stage === "verified" || op.saw_start || nativeStarted.has(op.id)) return "Decky 安装已开始，无法中断，仍将核验并保存结果";
-  if (op.cancel_requested || cancellingId === op.id) return "已请求停止，正在等待任务结果，不会重复发送";
-  if (cancelUncertain.has(op.id)) return "取消意图尚未确认，请先重新核对结果";
-  if (op.stage === "unknown") return "原生操作结果未知，请重新核对结果";
-  if (op.stage === "awaiting" && !op.request_id) return "正在关联 Decky 请求，尚不能安全取消";
+  if (["failed", "closed", "cancelled"].includes(op.stage)) return t("任务已经结束");
+  if (op.stage === "installing" || op.stage === "verified" || op.saw_start || nativeStarted.has(op.id)) return t("Decky 安装已开始，无法中断，仍将核验并保存结果");
+  if (op.cancel_requested || cancellingId === op.id) return t("已请求停止，正在等待任务结果，不会重复发送");
+  if (cancelUncertain.has(op.id)) return t("取消意图尚未确认，请先重新核对结果");
+  if (op.stage === "unknown") return t("原生操作结果未知，请重新核对结果");
+  if (op.stage === "awaiting" && !op.request_id) return t("正在关联 Decky 请求，尚不能安全取消");
   return null;
 }
 
@@ -182,7 +193,7 @@ export async function cancelCurrentOperation(identifier = snapshot.operation?.id
         result = (await recordInstallEvent(op.id, "cancelled", result.package!.name))!;
       } catch (error) {
         result = (await recordInstallEvent(op.id, "cancel_unknown", result.package!.name))!;
-        if (current() && result?.id === op.id) publish(result, `取消结果无法确认：${errorText(error)}。请重新核对，勿重复发送。`);
+        if (current() && result?.id === op.id) publish(result, t("取消结果无法确认：{0}。请重新核对，勿重复发送。", [errorText(error)]));
         return;
       }
     }
@@ -214,6 +225,42 @@ export async function dismissTaskNotice(identifier: string): Promise<void> {
     }
   }
 }
+export async function removeInstallPackage(identifier: string): Promise<void> {
+  const op = snapshot.operation;
+  if (!op || op.id !== identifier || op.artifact_deleted || !["failed", "closed", "cancelled"].includes(op.stage)) return;
+  const currentGeneration = generation;
+  try {
+    const result = await deleteInstallPackage(identifier);
+    if (currentGeneration === generation && snapshot.operation?.id === identifier && result.id === identifier) publish(result);
+  } catch (error) {
+    if (currentGeneration === generation && snapshot.operation?.id === identifier) publish(snapshot.operation, errorText(error));
+  }
+}
+
+export async function continueDownloaded(identifier: string): Promise<void> {
+  const op = snapshot.operation;
+  if (!op || op.id !== identifier || op.stage !== "failed" || op.download?.status !== "complete") return;
+  const currentGeneration = generation;
+  try {
+    const result = await continuePrepared(identifier);
+    if (currentGeneration === generation && result.id === identifier) publish(result);
+  } catch (error) {
+    if (currentGeneration === generation && snapshot.operation?.id === identifier) publish(snapshot.operation, errorText(error));
+  }
+}
+
+export async function retryFailedDownload(identifier: string): Promise<void> {
+  const op = snapshot.operation;
+  if (!op || op.id !== identifier || op.stage !== "failed" || op.download?.status !== "failed") return;
+  const currentGeneration = generation;
+  try {
+    const result = await retryDownload(identifier);
+    if (currentGeneration === generation && result.id === identifier) publish(result);
+  } catch (error) {
+    if (currentGeneration === generation && snapshot.operation?.id === identifier) publish(snapshot.operation, errorText(error));
+  }
+}
+
 
 export async function finishTracking(identifier = snapshot.operation?.id): Promise<void> {
   const op = snapshot.operation;
@@ -231,10 +278,31 @@ export async function requestUninstall(name: string): Promise<void> {
   try {
     const op = await getOperation();
     if (currentGeneration !== generation) return;
-    if (isActive(op)) throw new Error("请先处理当前安装任务，再卸载插件");
+    if (isActive(op)) throw new Error(t("请先处理当前安装任务，再卸载插件"));
     await uninstallPlugin(name, () => currentGeneration === generation && !isActive(snapshot.operation) && !preparing && !dispatching);
   } finally { if (currentGeneration === generation) uninstallIntent = false; }
 }
+async function refreshAfterUninstall(name: string, currentGeneration: number): Promise<void> {
+  const selected = getViewState().plugin;
+  try {
+    const listing = await refreshAfterPluginMutation();
+    if (currentGeneration !== generation || !listing || selected?.name !== name || listing.plugins.some(row => row.name === name)) return;
+    updateViewState(current => {
+      if (current.plugin !== selected) return current;
+      const targetPage = ["details", "maintenance", "versions", "binding"].includes(current.page)
+        || (current.page === "releaseNotes" && current.releaseNotes?.origin === "details")
+        || (current.page === "network" && current.networkOrigin === "details");
+      return { ...current, page: targetPage ? "home" : current.page, plugin: null,
+        detailOrigin: "home", focusReturn: null, bindingOrigin: "details",
+        operationOrigin: current.operationOrigin === "details" ? "home" : current.operationOrigin,
+        networkOrigin: "settings", releaseNotesFocus: false,
+        releaseNotes: current.releaseNotes?.origin === "details" ? null : current.releaseNotes,
+        detailSelection: { key: "", tag: null, zip: null }, bindingDraft: createBindingDraft(),
+        checkItem: null, checkSelection: null };
+    });
+  } catch (error) { if (currentGeneration === generation) toastError(error); }
+}
+
 export function startInstallController(): () => void {
   const currentGeneration = ++generation;
   let disposed = false;
@@ -259,6 +327,13 @@ export function startInstallController(): () => void {
     for (const event of events) recordEvent(operation, event);
   };
   const stopEvents = listenForInstallEvents((...event) => {
+    if (event[0] === "uninstall_returned") {
+      const op = snapshot.operation;
+      if (!(isActive(op) && op?.mode === "reinstall" && op.package?.name === event[1])) {
+        void refreshAfterUninstall(event[1], currentGeneration);
+      }
+      return;
+    }
     if (pendingEvents) pendingEvents.push(event);
     else recordEvent(snapshot.operation, event);
   });

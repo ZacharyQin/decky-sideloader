@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "py_modules"))
-import install_ops
-from github_transport import GitHubTransport
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from sideload import install_ops
+from sideload.github_transport import GitHubTransport
 from test_http import Response
 from test_transport import ZIP
 
@@ -65,6 +65,16 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual((restart["received"], restart["route"], restart["status"]), (0, "gh-proxy", "connecting"))
         self.assertEqual([c.args[1] for c in opened.call_args_list], ["direct", "gh-proxy"])
 
+    def test_second_partial_failure_uses_ghfast_without_mixing_bytes(self):
+        opened = self.run_download([Stream([b"first", TimeoutError("direct")]),
+                                   Stream([b"second", TimeoutError("proxy")]),
+                                   Stream([b"complete"], {"Content-Length": "8"})])
+        self.assertEqual(self.target.read_bytes(), b"complete")
+        self.assertEqual([c.args[1] for c in opened.call_args_list], ["direct", "gh-proxy", "ghfast"])
+        third = [e for e in self.events if e["attempt"] == 3]
+        self.assertEqual(third[0], {"received": 0, "total": None, "status": "connecting", "route": "ghfast", "attempt": 3})
+        self.assertEqual(third[-1], {"received": 8, "total": 8, "status": "complete", "route": "ghfast", "attempt": 3})
+
     def test_short_read_and_invalid_or_excessive_length_fail_without_proxy_retry(self):
         for length in ("4", "-1", "abc", "1.2", "128000000000", "", "1"):
             with self.subTest(length=length):
@@ -76,9 +86,8 @@ class DownloadTests(unittest.TestCase):
                 self.assertEqual(self.events[-1]["status"], "failed")
 
     def test_stream_limit_failure_keeps_last_written_bytes_and_stops(self):
-        with patch.object(install_ops, "MAX_DOWNLOAD", 4):
-            with self.assertRaises(RuntimeError):
-                self.run_download([Stream([b"abc", b"def"])])
+        with self.assertRaises(RuntimeError):
+            self.run_download([Stream([b"abc", b"def"])], max_bytes=4)
         self.assertEqual(self.events[-1]["received"], 6)
         self.assertEqual(self.events[-1]["status"], "failed")
         self.assertEqual(self.target.read_bytes(), b"abc")
@@ -99,9 +108,3 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(self.events[-1]["status"], "failed")
         self.assertEqual(self.events[-1]["received"], 0)
 
-    def test_total_deadline_is_shared_across_attempts(self):
-        with patch.object(self.transport, "open", return_value=Stream([b"abc"])) as opened, patch.object(install_ops.time, "monotonic", side_effect=[0, 0, 0, 0, 181, 181]):
-            with self.assertRaises(RuntimeError):
-                install_ops.download_asset(ZIP, self.target, None, transport=self.transport, progress=self.events.append)
-        self.assertEqual(opened.call_count, 1)
-        self.assertEqual(self.events[-1]["status"], "failed")

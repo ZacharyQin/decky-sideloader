@@ -1,11 +1,7 @@
-// Semantic index:
-// - participant: docs/upstream-conflict/sideload/plugin-management.md -- provide distinct themed update glyphs and decorative action SVGs without adding controls.
-// - participant: docs/upstream-conflict/sideload/diagnostics-sharing.md -- provide decorative pickup, copy, details and stop glyphs.
-// - participant: docs/upstream-conflict/sideload/diagnostics.md -- provide the decorative export action glyph.
 import {
   FaArrowUp, FaArrowLeft, FaArchive, FaCheckCircle, FaCog, FaDownload, FaExchangeAlt,
-  FaExclamationTriangle, FaQuestionCircle, FaFileAlt, FaGithub, FaHistory, FaLink, FaList, FaPuzzlePiece, FaSearch,
-  FaShieldAlt, FaSyncAlt, FaTimesCircle, FaTrashAlt, FaUnlink, FaQrcode, FaCopy,
+  FaExclamationTriangle, FaQuestionCircle, FaFileAlt, FaGithub, FaHistory, FaLink, FaList, FaPuzzlePiece, FaRedoAlt, FaSearch,
+  FaShieldAlt, FaSyncAlt, FaTimesCircle, FaTrashAlt, FaUnlink, FaQrcode, FaCopy, FaTools, FaGlobe,
 } from "react-icons/fa";
 import { updaterFieldClasses } from "@decky/ui";
 import type { IconType } from "react-icons";
@@ -14,14 +10,16 @@ export const icons = {
   back: FaArrowLeft, checkUpdates: FaSyncAlt, newInstall: FaDownload,
   settings: FaCog, binding: FaLink, manageBinding: FaGithub,
   saveBinding: FaCheckCircle, unlink: FaUnlink, replace: FaExchangeAlt,
-  reinstall: FaSyncAlt, uninstall: FaTrashAlt, search: FaSearch, searchMode: FaSearch, manualRepo: FaGithub,
-  returnSearch: FaArrowLeft, probeRepo: FaShieldAlt, readReleases: FaHistory,
+  reinstall: FaSyncAlt, uninstall: FaTrashAlt, search: FaSearch, manualRepo: FaGithub,
+  returnSearch: FaArrowLeft, readReleases: FaHistory, refreshReleases: FaSyncAlt,
   installPackage: FaDownload, changePlugin: FaPuzzlePiece, changeRepo: FaGithub,
-  releaseNotes: FaFileAlt, reloadSettings: FaSyncAlt,
-  dismissTask: FaTimesCircle, viewTask: FaList, refreshTask: FaSyncAlt, confirmInstall: FaShieldAlt,
+  releaseNotes: FaFileAlt, licenses: FaFileAlt, reloadSettings: FaSyncAlt,
+  dismissTask: FaTimesCircle, viewTask: FaList, refreshTask: FaSyncAlt, refreshRecognition: FaRedoAlt, deletePackage: FaTrashAlt, confirmInstall: FaShieldAlt,
   shareDiagnostics: FaQrcode, copyDiagnostics: FaCopy, stopDiagnostics: FaTimesCircle, diagnosticDetails: FaFileAlt,
   exportDiagnostics: FaFileAlt, takeover: FaShieldAlt, returnStore: FaExchangeAlt, readOwnership: FaSyncAlt,
-  cancelRequest: FaTimesCircle, finishTracking: FaArchive,
+  cancelRequest: FaTimesCircle, finishTracking: FaArchive, skipRelease: FaTimesCircle, continueInstall: FaShieldAlt, retryDownload: FaSyncAlt,
+  maintenance: FaTools, network: FaGlobe,
+  deleteBackups: FaTrashAlt,
 } satisfies Record<string, IconType>;
 export type IconKey = keyof typeof icons;
 

@@ -1,9 +1,9 @@
-// Semantic index:
-// - participant: docs/upstream-conflict/sideload/plugin-management.md -- search and select a repository before explicit binding; preserve drafts and reject stale search results.
-import { Focusable, NavEntryPositionPreferences, PanelSection, PanelSectionRow, TextField } from "@decky/ui";
+import { t } from "./i18n";
+import { Focusable, NavEntryPositionPreferences, PanelSectionRow, TextField } from "@decky/ui";
 import { useEffect } from "react";
 import { clearBinding, searchRepositories, setBinding } from "./api";
-import { Action, errorText, Explanation, Status } from "./components";
+import { Action, Explanation, Heading, PanelSection, Status } from "./components";
+import { errorText } from "./errors";
 import { RepositorySearch, repositoryDetails } from "./RepositorySearch";
 import { createBindingDraft, getViewState, updateViewState, useViewState, type BindingDraft } from "./viewState";
 import { changeOwnership, useOwnership } from "./ownershipController";
@@ -56,36 +56,36 @@ export function BindingEditor({ plugin, onSaved }: { plugin: PluginRow; onSaved:
   };
   const phase = form.mode === "manual" ? "manual" : form.selected ? "selected" : "search";
   const backToSearch = () => change({ mode: "search", selected: null, error: null });
-  if (!pluginCanBind(plugin) && !takeover) return <PanelSection><Status title="归属未确认">请从插件详情回查接管状态。</Status></PanelSection>;
+  if (!pluginCanBind(plugin) && !takeover) return <PanelSection><Status title={t("归属未确认")}>{t("请从插件详情回查接管状态。")}</Status></PanelSection>;
   return <Focusable key={phase} autoFocus flow-children="column" navEntryPreferPosition={NavEntryPositionPreferences.PREFERRED_CHILD}
     onCancel={(event) => {
       if (phase !== "search") { event.preventDefault(); event.stopPropagation(); if (!form.busy) backToSearch(); }
-    }} onCancelActionDescription={phase === "search" ? "返回插件详情" : "返回搜索"}>
-    <PanelSection title={`${takeover ? "接管商店插件" : "关联仓库"}：${plugin.name}`}>
-      {plugin.repo && <Status title="当前关联">{plugin.repo}</Status>}
-      {plugin.repo_source === "package.json" && <Explanation>仓库来自插件元数据，保存前请核对作者与插件对应关系。</Explanation>}
-      {takeover && <Explanation>此插件目前由商店负责。接管会暂停它的商店更新检查，由本插件追踪所确认的 GitHub 仓库。不会安装或卸载程序；可从详情交还商店。原生冻结不禁止手动商店安装，也不保证取消已在途检查。</Explanation>}
-      {ownership.error && <Status tone="error" title="接管未确认">{ownership.error}</Status>}
-      {form.error && <Status tone="error" title="操作失败">{form.error}</Status>}
+    }} onCancelActionDescription={phase === "search" ? t("返回插件详情") : t("返回搜索")}>
+    <PanelSection><Heading title={takeover ? t("接管商店插件") : t("关联仓库")}>{plugin.name}</Heading>
+      {plugin.repo && <Status title={t("当前关联")}>{plugin.repo}</Status>}
+      {plugin.repo_source === "package.json" && <Explanation>{t("仓库来自插件元数据，保存前请核对作者与插件对应关系。")}</Explanation>}
+      {takeover && <Explanation>{t("此插件目前由商店负责。接管会暂停它的商店更新检查，由本插件追踪所确认的 GitHub 仓库。不会安装或卸载程序；可从详情交还商店。原生冻结不禁止手动商店安装，也不保证取消已在途检查。")}</Explanation>}
+      {ownership.error && <Status tone="error" title={t("接管未确认")}>{ownership.error}</Status>}
+      {form.error && <Status tone="error" title={t("操作失败")}>{form.error}</Status>}
       {phase === "search" && <>
         <RepositorySearch query={form.query} results={form.results} selected={form.value} busy={form.searching} disabled={form.busy}
           onQuery={(query) => change({ query, results: null, error: null, searching: false, request: ++requestSequence })}
           onSearch={() => void search()} onSelect={select} />
-        <Action kind="manualRepo" disabled={form.busy} onClick={() => change({ mode: "manual", searching: false, request: ++requestSequence, error: null })}>直接填写仓库</Action>
+        <Action kind="manualRepo" disabled={form.busy} onClick={() => change({ mode: "manual", searching: false, request: ++requestSequence, error: null })}>{t("直接填写仓库")}</Action>
       </>}
       {phase === "selected" && form.selected && <>
-        <Status title="已选择仓库">{form.selected.repo}{repositoryDetails(form.selected)}</Status>
-        <Explanation>保存后，插件会从此仓库追踪版本。安装时仍会校验发布包身份。</Explanation>
+        <Status title={t("已选择仓库")}>{form.selected.repo}{repositoryDetails(form.selected)}</Status>
+        <Explanation>{t("保存后，插件会从此仓库追踪版本。安装时仍会校验发布包身份。")}</Explanation>
       </>}
-      {phase === "manual" && <PanelSectionRow><TextField label="GitHub 仓库" description="owner/repo 或 github.com 链接"
+      {phase === "manual" && <PanelSectionRow><TextField label={t("GitHub 仓库")} description={t("owner/repo 或 github.com 链接")}
         value={form.value} disabled={form.busy} onChange={(e) => change({ value: e.target.value, error: null })} /></PanelSectionRow>}
       {phase !== "search" && <>
-        <Action kind="saveBinding" disabled={form.busy || ownership.busy || !form.value.trim()} onClick={() => void save(false)}>{form.busy || ownership.busy ? "正在保存…" : takeover ? "接管并暂停商店检查" : "保存关联"}</Action>
-        <Action kind="returnSearch" disabled={form.busy} onClick={backToSearch}>返回搜索</Action>
+        <Action kind="saveBinding" disabled={form.busy || ownership.busy || !form.value.trim()} onClick={() => void save(false)}>{form.busy || ownership.busy ? t("正在保存…") : takeover ? t("接管并暂停商店检查") : t("保存关联")}</Action>
+        <Action kind="returnSearch" disabled={form.busy} onClick={backToSearch}>{t("返回搜索")}</Action>
       </>}
       {plugin.repo && !takeover && <>
-        <Action kind="unlink" disabled={form.busy} onClick={() => void save(true)}>解除关联</Action>
-        <Explanation>解除关联后，插件会停止版本追踪，保留已安装程序。</Explanation>
+        <Action kind="unlink" disabled={form.busy} onClick={() => void save(true)}>{t("解除关联")}</Action>
+        <Explanation>{t("解除关联后，插件会停止版本追踪，保留已安装程序。")}</Explanation>
       </>}
     </PanelSection>
   </Focusable>;

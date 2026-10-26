@@ -5,15 +5,16 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZipFile, ZipInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "py_modules"))
-import install_ops
-from github_transport import _Budget, GitHubTransport
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from sideload import install_ops
+from sideload.github_transport import _Budget, GitHubTransport
 from test_transport import ZIP, trickling_response
-from install_ops import download_asset, backup_data, inspect_archive, plugin_stamp, verify_installed
+from sideload.install_ops import download_asset, backup_data, inspect_archive, plugin_stamp, verify_installed
 
 
 def make_package(path, *, name="Example", folder="example", version="2.0.0", extra=None):
@@ -38,8 +39,14 @@ class InstallOpsTests(unittest.TestCase):
         self.zip = make_package(self.home / "plugin.zip")
 
     def inspect(self, existing=None, installed=None):
-        return inspect_archive(self.zip, existing, installed or [], "GitHub Sideload", "github-sideload")
+        return inspect_archive(self.zip, existing, installed or [], "decky-sideloader", "decky-sideloader")
 
+
+    def test_spaced_directory_name_is_one_plugin_folder(self):
+        path = self.home / "spaced.zip"
+        make_package(path, name="DLSS Enabler", folder="DLSS Enabler")
+        package = inspect_archive(path, {"name": "DLSS Enabler", "folder": "DLSS Enabler"}, [], "decky-sideloader", "decky-sideloader")
+        self.assertEqual(package["folder"], "DLSS Enabler")
     def test_valid_package_has_real_identity_and_hashes(self):
         package = self.inspect()
         self.assertEqual(package["name"], "Example")
@@ -87,7 +94,7 @@ class InstallOpsTests(unittest.TestCase):
             self.inspect({"name": "Different", "folder": "example"})
         with self.assertRaises(RuntimeError):
             self.inspect({"name": "Example", "folder": "old-folder"})
-        for name, folder in (("GitHub Sideload", "example"), ("Example", "github-sideload")):
+        for name, folder in (("decky-sideloader", "example"), ("Example", "decky-sideloader")):
             make_package(self.zip, name=name, folder=folder)
             with self.assertRaises(RuntimeError):
                 self.inspect()
@@ -160,30 +167,47 @@ class InstallOpsTests(unittest.TestCase):
         for url in ("http://github.com/acme/foo/releases/download/v1/foo.zip", "https://localhost/a.zip", "file:///etc/passwd", "https://github.com.evil.test/a.zip"):
             self.assertFalse(install_ops._allowed_download(url, initial=True))
 
-    def test_download_absolute_deadline_interrupts_framing_and_is_not_reset_by_fallback(self):
+    def test_download_interrupts_framing_and_bounds_each_fallback_deadline(self):
         transport = GitHubTransport(None, "auto")
         opened = transport.open
-        attempts, budgets, events = [], [], []
+        attempts, events = [], []
         target = self.home / "download.zip"
         def short_budget(_expires, cancel, **kwargs):
-            budget = _Budget(time.monotonic() + 0.07, cancel, **kwargs)
-            budgets.append(budget)
-            return budget
+            return _Budget(time.monotonic() + 0.07, cancel, **kwargs)
+        @contextmanager
         def open_route(url, route, **kwargs):
-            attempts.append((route, kwargs["budget"]))
+            attempts.append(route)
             if route == "direct":
                 time.sleep(0.025)
                 raise TimeoutError("offline")
-            return opened(url, route, **kwargs)
+            with trickling_response(prefix):
+                with opened(url, route, **kwargs) as response:
+                    yield response
         prefix = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1;extension="
-        with trickling_response(prefix), patch.object(install_ops, "_Budget", side_effect=short_budget), patch.object(transport, "open", side_effect=open_route):
+        with patch.object(install_ops, "_Budget", side_effect=short_budget), patch.object(transport, "open", side_effect=open_route):
             start = time.monotonic()
             with self.assertRaisesRegex(RuntimeError, "3 分钟"):
                 download_asset(ZIP, target, None, transport=transport, progress=events.append)
             self.assertLess(time.monotonic() - start, 0.3)
-        self.assertEqual([route for route, _ in attempts], ["direct", "gh-proxy"])
-        self.assertTrue(all(budget is budgets[0] for _, budget in attempts))
-        self.assertEqual(len(budgets), 1)
+        self.assertEqual(attempts, ["direct", "gh-proxy", "ghfast"])
         self.assertEqual(events[-1]["status"], "failed")
-        self.assertEqual(events[-1]["attempt"], 2)
+        self.assertEqual(events[-1]["attempt"], 3)
         self.assertEqual(target.read_bytes(), b"")
+
+    def test_download_response_timeout_falls_back_but_does_not_cap_body_duration(self):
+        transport = GitHubTransport(None, "auto")
+        opened, attempts, events = transport.open, [], []
+        target = self.home / "download.zip"
+        @contextmanager
+        def route_response(url, route, **kwargs):
+            attempts.append(route)
+            prefix = b"HTTP/1.1 200 OK\r\nX-Slow: " if route == "direct" else b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n"
+            body = b"x" * 200 if route == "direct" else b"0123456789"
+            with trickling_response(prefix, tail=body, interval=0.01):
+                with opened(url, route, **kwargs) as response:
+                    yield response
+        with patch.object(install_ops, "DOWNLOAD_RESPONSE_SECONDS", 0.06), patch.object(transport, "open", side_effect=route_response):
+            download_asset(ZIP, target, None, transport=transport, progress=events.append)
+        self.assertEqual(attempts, ["direct", "gh-proxy"])
+        self.assertEqual(target.read_bytes(), b"0123456789")
+        self.assertEqual(events[-1]["status"], "complete")

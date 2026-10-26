@@ -1,8 +1,9 @@
-// Semantic index:
-// - owner: docs/upstream-conflict/sideload/diagnostics-sharing.md -- keep one pickup intent, guarded address draft and bounded status polling across QAM mounts without replay.
-// - owner: docs/upstream-conflict/sideload/diagnostics.md -- bound frontend observations and retain one export intent across QAM mounts without replay.
+import { t } from "./i18n";
 import { useSyncExternalStore } from "react";
 import type { DiagnosticEvent, DiagnosticStatus, DiagnosticShare } from "./types";
+import type { Page } from "./viewState";
+import { cleanDiagnosticEvent, frontendErrorType, frontendLocation } from "./diagnosticEvents";
+import { frontendIdentity } from "./build";
 
 type Protocol = {
   record: (events: DiagnosticEvent[], dropped: number) => Promise<{ accepted: number }>;
@@ -28,6 +29,12 @@ let generation = 0;
 let exportRevision = 0;
 let intent: Promise<void> | null = null;
 let state: DiagnosticStatus = { state: "idle" };
+let clientId = "";
+let page: Page = "home";
+let viewRevision = 0;
+let pendingFlush: Promise<void> | null = null;
+let flushTimer: ReturnType<typeof setTimeout> | undefined;
+let releaseDrain: (() => void) | undefined;
 const listeners = new Set<() => void>();
 const publish = (next: DiagnosticStatus) => { state = next; for (const listener of listeners) listener(); };
 const drop = (count = 1) => { dropped = Math.min(65535, dropped + count); };
@@ -35,21 +42,69 @@ const drop = (count = 1) => { dropped = Math.min(65535, dropped + count); };
 export function recordDiagnostic(event: DiagnosticEvent): void {
   try {
     if (!protocol) return;
-    if (event.event !== "loader_read" || typeof event.ok !== "boolean" || !Number.isInteger(event.count) || event.count < 0 || event.count > 2147483647 ||
-      !Number.isInteger(event.durationMs) || event.durationMs < 0 || event.durationMs > 2147483647) { drop(); return; }
+    const clean = cleanDiagnosticEvent(event);
+    if (!clean) { drop(); return; }
     if (queue.length >= MAX_QUEUE) { drop(); return; }
-    // Copy known primitives only; never retain the caller's object or error payload.
-    queue.push({ event: "loader_read", ok: event.ok, count: event.count, durationMs: event.durationMs });
+    queue.push(clean);
     schedule();
   } catch { /* Observability cannot change the read-only Loader result. */ }
+}
+
+export function recordUIAction(action: string): void {
+  recordDiagnostic({ event: "ui_action", action, page, clientId });
+}
+
+export function recordFrontendError(error: unknown, origin: Extract<DiagnosticEvent, { event: "frontend_error" }>["origin"]): void {
+  try { recordDiagnostic({ event: "frontend_error", page, origin, clientId, errorType: frontendErrorType(error), ...frontendLocation(error) }); }
+  catch { /* Diagnostic collection must not replace the original error. */ }
+}
+
+export async function recordDiagnosticView(next: Page, plugin?: string | null, release?: string | null): Promise<void> {
+  page = next;
+  const revision = ++viewRevision, id = generation, client = clientId;
+  const fingerprint = async (kind: string, value: string | null | undefined) => {
+    if (!value || value.length > 4096) return undefined;
+    try { return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${kind}:${value}`)))).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 32); }
+    catch { return undefined; }
+  };
+  const [pluginId, releaseId] = await Promise.all([fingerprint("plugin", plugin), fingerprint("release", release)]);
+  if (id !== generation || revision !== viewRevision) return;
+  recordDiagnostic({ event: "ui_page", page: next, clientId: client, ...(pluginId ? { pluginId } : {}), ...(releaseId ? { releaseId } : {}) });
+}
+
+function recordIdentity() {
+  if (frontendIdentity) recordDiagnostic({ event: "frontend_build", ...frontendIdentity, clientId });
+}
+
+function flush(): Promise<void> {
+  if (pendingFlush) return pendingFlush;
+  const id = generation;
+  const task = sendBatch().finally(() => { if (id === generation) pendingFlush = null; });
+  pendingFlush = task;
+  return task;
+}
+
+function flushBeforeExport(): Promise<void> | null {
+  recordIdentity();
+  if (!queue.length && !sending) return null;
+  clearTimeout(timer); timer = undefined;
+  const id = generation;
+  const deadline = new Promise<void>(resolve => { releaseDrain = resolve; flushTimer = setTimeout(resolve, 1000); });
+  const drain = async () => { for (let i = 0; i < 3 && id === generation && protocol && (queue.length || sending); i++) await flush(); };
+  return Promise.race([drain(), deadline]).finally(() => {
+    if (id !== generation) return;
+    clearTimeout(flushTimer); flushTimer = undefined; releaseDrain = undefined;
+    clearTimeout(timer); timer = undefined;
+    schedule();
+  });
 }
 
 function schedule() {
   if (!protocol || sending || timer || !queue.length) return;
   timer = setTimeout(() => { timer = undefined; void flush(); }, 250);
 }
-async function flush() {
-  if (!protocol || sending) return;
+async function sendBatch() {
+  if (!protocol || sending || !queue.length && !dropped) return;
   const id = generation;
   const current = protocol;
   const batch = queue.splice(0, MAX_BATCH);
@@ -65,6 +120,15 @@ async function flush() {
 export function startDiagnostics(next: Protocol): () => void {
   const id = ++generation;
   protocol = next;
+  clientId = crypto.randomUUID().replace(/-/g, "");
+  page = "home";
+  recordIdentity();
+  const onError = (event: ErrorEvent) => { if (frontendLocation(event.error)) recordFrontendError(event.error, "global"); };
+  const onRejected = (event: PromiseRejectionEvent) => { if (frontendLocation(event.reason)) recordFrontendError(event.reason, "unhandled"); };
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejected);
+  }
   shareIntent = null;
   publishShare({ status: { state: "idle" }, addresses: [], loading: Boolean(next.sharing) });
   if (next.sharing) void refreshDiagnosticShare();
@@ -75,12 +139,20 @@ export function startDiagnostics(next: Protocol): () => void {
       if (id !== generation || intent || revision !== exportRevision) return;
       publish(result);
       if (result.state === "exporting" && remaining > 0) statusTimer = setTimeout(() => { statusTimer = undefined; void readStatus(remaining - 1); }, 1000);
-      else if (result.state === "exporting") publish({ state: "error", error: "诊断导出仍未完成，请稍后重试读取状态" });
-    } catch { if (id === generation && !intent && revision === exportRevision) publish({ state: "error", error: "诊断状态读取失败，可重试导出" }); }
+      else if (result.state === "exporting") publish({ state: "error", error: t("诊断导出仍未完成，请稍后重试读取状态") });
+    } catch { if (id === generation && !intent && revision === exportRevision) publish({ state: "error", error: t("诊断状态读取失败，可重试导出") }); }
   };
   void readStatus(60);
   return () => {
     if (id !== generation) return;
+    if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejected);
+    }
+    ++viewRevision;
+    pendingFlush = null;
+    releaseDrain?.(); releaseDrain = undefined;
+    clearTimeout(flushTimer); flushTimer = undefined;
     const activeSession = shareState.status.session;
     if (next.sharing && activeSession) void next.sharing.stop(activeSession).catch(() => {});
     ++generation; protocol = null; queue = []; dropped = 0; sending = false;
@@ -105,9 +177,11 @@ export function requestDiagnosticsExport(): Promise<void> {
   publish({ state: "exporting" });
   intent = (async () => {
     try {
+      const drain = flushBeforeExport(); if (drain) await drain;
+      if (id !== generation) return;
       const result = await current.export();
       if (id === generation) publish(result);
-    } catch { if (id === generation) publish({ state: "error", error: "诊断导出失败，请重试" }); }
+    } catch { if (id === generation) publish({ state: "error", error: t("诊断导出失败，请重试") }); }
     finally { if (id === generation) intent = null; }
   })();
   return intent;
@@ -159,9 +233,9 @@ function pollShare(id: number, revision: number, remaining = 360) {
       if (id !== generation || revision !== shareRevision || shareIntent) return;
       publishShare({ ...shareState, status, error: undefined });
       if (remaining > 0) pollShare(id, revision, remaining - 1);
-      else publishShare({ ...shareState, error: "下载状态读取超时，请停止或刷新状态" });
+      else publishShare({ ...shareState, error: t("下载状态读取超时，请停止或刷新状态") });
     } catch {
-      if (id === generation && revision === shareRevision && !shareIntent) publishShare({ ...shareState, status: { state: "error", session: shareState.status.session }, error: "下载状态读取失败，请停止或刷新状态" });
+      if (id === generation && revision === shareRevision && !shareIntent) publishShare({ ...shareState, status: { state: "error", session: shareState.status.session }, error: t("下载状态读取失败，请停止或刷新状态") });
     }
   }, 1000);
 }
@@ -177,7 +251,7 @@ export async function refreshDiagnosticShare(): Promise<void> {
     publishShare({ ...shareState, status, addresses, loading: false });
     pollShare(id, revision);
   } catch {
-    if (id === generation && revision === shareRevision && !shareIntent) publishShare({ ...shareState, loading: false, error: "下载状态读取失败，请刷新后重试" });
+    if (id === generation && revision === shareRevision && !shareIntent) publishShare({ ...shareState, loading: false, error: t("下载状态读取失败，请刷新后重试") });
   }
 }
 
@@ -192,10 +266,12 @@ export function requestDiagnosticShare(address: string): Promise<void> {
   publishShare({ ...shareState, loading: false, status: { state: "preparing", session }, error: undefined });
   shareIntent = (async () => {
     try {
+      const drain = flushBeforeExport(); if (drain) await drain;
+      if (id !== generation || revision !== shareRevision) return;
       const status = await current.start(address, session, previous);
       if (id === generation && revision === shareRevision) publishShare({ ...shareState, status });
     } catch {
-      if (id === generation && revision === shareRevision) publishShare({ ...shareState, status: { state: "error", session }, error: "下载启动未确认，请刷新状态或停止后重试" });
+      if (id === generation && revision === shareRevision) publishShare({ ...shareState, status: { state: "error", session }, error: t("下载启动未确认，请刷新状态或停止后重试") });
     } finally {
       if (id === generation && revision === shareRevision) { shareIntent = null; pollShare(id, revision); }
     }
@@ -215,7 +291,7 @@ export function stopDiagnosticShare(): Promise<void> {
       const status = await current.stop(session);
       if (id === generation && revision === shareRevision) publishShare({ ...shareState, status });
     } catch {
-      if (id === generation && revision === shareRevision) publishShare({ ...shareState, status: { state: "error", session }, error: "停止未确认，请刷新状态后重试" });
+      if (id === generation && revision === shareRevision) publishShare({ ...shareState, status: { state: "error", session }, error: t("停止未确认，请刷新状态后重试") });
     } finally {
       if (id === generation && revision === shareRevision) shareIntent = null;
     }

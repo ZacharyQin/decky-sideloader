@@ -1,5 +1,7 @@
 import deckyPlugin from "@decky/rollup";
+import licenseNotices from "./scripts/license-notices.mjs";
+import buildIdentity from "./scripts/build-identity.mjs";
 
 export default deckyPlugin({
-  // Add extra Rollup options here when needed.
+  plugins: [buildIdentity(), licenseNotices()],
 });

@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "py_modules"))
-import catalog
-from catalog import Catalog, parse_gitmodules, registration_for, validate_names
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from sideload import catalog
+from sideload.catalog import Catalog, parse_gitmodules, registration_for, validate_names
 
 REGISTRY = '''[submodule "plugins/deck-roulette"]
  path = plugins/deck-roulette

@@ -13,9 +13,10 @@ from unittest.mock import Mock, patch
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "py_modules"))
-import github_transport as network
-from github_transport import GitHubTransport, allowed_url
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+import sideload
+from sideload import github_transport as network
+from sideload.github_transport import GitHubTransport, allowed_url
 from test_http import Response
 
 API = "https://api.github.com/repos/acme/plugin/releases"
@@ -68,7 +69,7 @@ class TransportTests(unittest.TestCase):
         urls = [API, "https://api.github.com/search/repositories?q=test", "https://api.github.com/repos/a/b/git/trees/HEAD?recursive=1", "https://api.github.com/repos/a/b/git/blobs/abc", "https://raw.githubusercontent.com/a/b/main/plugin.json", ZIP]
         for url in urls:
             with self.subTest(url=url):
-                address = network.PROXY_ORIGIN + "/" + url
+                address = network.PROXY_ORIGINS["gh-proxy"] + "/" + url
                 opener = Mock(open=Mock(return_value=Response(b'{}', address)))
                 observed = Mock()
                 with patch.object(network.urllib.request, "build_opener", return_value=opener):
@@ -84,7 +85,7 @@ class TransportTests(unittest.TestCase):
                     self.assertEqual(observed.call_args.args[0]["route"], "gh-proxy")
 
     def test_initial_proxy_cannot_expand_input_allowlist(self):
-        for url in [network.PROXY_ORIGIN + "/" + ZIP, "https://release-assets.githubusercontent.com/x.zip", "https://api.github.com/x", "https://github.com/a/b/archive/v1.zip"]:
+        for url in [network.PROXY_ORIGINS["gh-proxy"] + "/" + ZIP, network.PROXY_ORIGINS["ghfast"] + "/" + ZIP, "https://release-assets.githubusercontent.com/x.zip", "https://api.github.com/x", "https://github.com/a/b/archive/v1.zip"]:
             with self.subTest(url=url), patch.object(network.urllib.request, "build_opener") as build:
                 with self.assertRaises(RuntimeError):
                     with GitHubTransport(None, "gh-proxy").open(url, "gh-proxy", kind="download"):
@@ -96,15 +97,15 @@ class TransportTests(unittest.TestCase):
         for url in bad:
             for kind in ("query", "download"):
                 with self.subTest(url=url, kind=kind):
-                    self.assertFalse(allowed_url(url, kind, proxy=True))
+                    self.assertFalse(allowed_url(url, kind, proxy="gh-proxy"))
                     with self.assertRaises(RuntimeError):
-                        network._Redirect(kind, True).redirect_request(Request(API), None, 302, "", {}, url)
-        self.assertTrue(allowed_url(network.PROXY_ORIGIN + "/" + API, "query", proxy=True))
+                        network._Redirect(kind, "gh-proxy").redirect_request(Request(API), None, 302, "", {}, url)
+        self.assertTrue(allowed_url(network.PROXY_ORIGINS["gh-proxy"] + "/" + API, "query", proxy="gh-proxy"))
         self.assertTrue(allowed_url("https://release-assets.githubusercontent.com/x.zip", "download"))
         self.assertFalse(allowed_url("https://release-assets.githubusercontent.com/x.zip", "query"))
 
     def test_final_url_is_checked_even_without_redirect_handler(self):
-        for mode in ("direct", "gh-proxy"):
+        for mode in ("direct", "gh-proxy", "ghfast"):
             response = Response(b'{}', "https://evil.test/a")
             with patch.object(network.urllib.request, "build_opener", return_value=Mock(open=Mock(return_value=response))):
                 with self.assertRaises(RuntimeError):
@@ -121,7 +122,7 @@ class TransportTests(unittest.TestCase):
                 network.content_length(candidate, 100)
 
     def test_redirect_count_is_bounded(self):
-        redirect = network._Redirect("query", True)
+        redirect = network._Redirect("query", "gh-proxy")
         for i in range(5):
             self.assertIsNotNone(redirect.redirect_request(Request(API), None, 302, "", {}, API + f"?n={i}"))
         with self.assertRaises(RuntimeError):
@@ -147,50 +148,133 @@ class TransportTests(unittest.TestCase):
                         transport.fetch_json(API)
                     self.assertEqual(opened.call_count, 1)
 
-    def test_direct_and_proxy_only_never_retry_and_auto_stops_after_second_failure(self):
-        for mode, calls in (("direct", 1), ("gh-proxy", 1), ("auto", 2)):
+    def test_api_auto_and_ghfast_exhaust_only_direct_and_ghproxy(self):
+        for mode, calls in (("direct", 1), ("gh-proxy", 1), ("auto", 2), ("ghfast", 2)):
             transport = GitHubTransport(None, mode)
             with patch.object(transport, "open", side_effect=TimeoutError("offline")) as opened:
                 with self.assertRaises(RuntimeError):
                     transport.fetch_json(API)
             self.assertEqual(opened.call_count, calls)
 
-    def test_absolute_deadline_interrupts_real_status_headers_chunk_size_trailer_and_body(self):
+    def test_ghfast_redirects_cannot_cross_proxy_or_expand_sources(self):
+        raw = "https://raw.githubusercontent.com/a/b/main/file"
+        self.assertTrue(allowed_url("https://ghfast.top/" + raw, "query", proxy="ghfast"))
+        self.assertTrue(allowed_url("https://ghfast.top/" + ZIP, "download", proxy="ghfast"))
+        for url in ("http://ghfast.top/" + ZIP, "https://ghfast.top:443/" + ZIP,
+                    "https://user@ghfast.top/" + ZIP, "https://ghfast.top.evil.test/" + ZIP,
+                    "https://ghfast.top/https://evil.test/a.zip", "https://ghfast.top/https://gh-proxy.org/" + ZIP,
+                    "https://ghfast.top/https://ghfast.top/" + ZIP, "https://gh-proxy.org/" + ZIP):
+            with self.subTest(url=url):
+                self.assertFalse(allowed_url(url, "download", proxy="ghfast"))
+                with self.assertRaises(RuntimeError):
+                    network._Redirect("download", "ghfast").redirect_request(Request(ZIP), None, 302, "", {}, url)
+
+    def test_raw_auto_reaches_ghfast_but_stops_on_permission_error(self):
+        url = "https://raw.githubusercontent.com/a/b/main/file"
+        transport = GitHubTransport(None, "auto")
+        with patch.object(transport, "open", side_effect=[TimeoutError(), TimeoutError(), Response(b"raw")]) as opened:
+            self.assertEqual(transport.fetch_bytes(url), b"raw")
+            self.assertEqual([call.args[1] for call in opened.call_args_list], ["direct", "gh-proxy", "ghfast"])
+        with patch.object(transport, "open", side_effect=[TimeoutError(), HTTPError(url, 403, "denied", {}, None)]) as opened:
+            with self.assertRaises(RuntimeError):
+                transport.fetch_bytes(url)
+            self.assertEqual(opened.call_count, 2)
+
+    def test_ghfast_range_keeps_partial_response_semantics(self):
+        with trickling_response(b"HTTP/1.1 206 Partial Content\r\nContent-Length: 3\r\nContent-Range: bytes 7-9/10\r\n\r\n", tail=b"zip"):
+            self.assertEqual(GitHubTransport(None, "ghfast").fetch_range(ZIP, None, 3), (b"zip", 7, 10))
+
+    def test_query_timeout_interrupts_headers_and_framing_without_body_progress(self):
         prefixes = {
             "status": b"HTTP/1.1 200 ",
             "headers": b"HTTP/1.1 200 OK\r\nX-Slow: ",
             "chunk-size": b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1;extension=",
             "trailer": b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\nX-Slow: ",
-            "body": b"HTTP/1.1 200 OK\r\nContent-Length: 200\r\n\r\n",
         }
         for stage, prefix in prefixes.items():
             with self.subTest(stage=stage), trickling_response(prefix):
                 start = time.monotonic()
-                with self.assertRaisesRegex(RuntimeError, "总时限"):
-                    GitHubTransport(None).fetch_bytes(API, timeout=0.02, deadline=0.07)
+                with self.assertRaisesRegex(RuntimeError, "等待.*超时"):
+                    GitHubTransport(None).fetch_bytes(API, timeout=0.07)
                 self.assertLess(time.monotonic() - start, 0.3)
 
-    def test_proxy_retry_shares_one_absolute_budget(self):
-        budgets = []
-        def opened(_request, **kwargs):
-            handler = handlers[-1]
-            budgets.append(handler.budget)
-            if len(budgets) == 2:
-                time.sleep(max(0, handler.budget.expires - time.monotonic()) + 0.005)
-            raise URLError(TimeoutError("offline"))
-        handlers = []
-        build = network.urllib.request.build_opener
-        def opener(*args):
-            handlers.append(next(h for h in args if isinstance(h, network._HTTPSHandler)))
-            result = build(*args)
-            result.open = opened
-            return result
-        transport = GitHubTransport(ssl.create_default_context(), "auto")
-        with patch.object(network.urllib.request, "build_opener", side_effect=opener):
-            with self.assertRaisesRegex(RuntimeError, "总时限"):
-                transport.fetch_bytes(API, deadline=0.06)
-        self.assertEqual(len(budgets), 2)
-        self.assertIs(budgets[0], budgets[1])
+    def test_query_deadline_exhaustion_still_gives_proxy_a_fresh_attempt(self):
+        transport = GitHubTransport(None, "auto")
+        opened, attempts = transport.open, []
+        @contextmanager
+        def route_response(url, route, **kwargs):
+            attempts.append(route)
+            prefix = b"HTTP/1.1 200 OK\r\nX-Slow: " if route == "direct" else b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n"
+            body = b"x" * 200 if route == "direct" else b"{}"
+            with trickling_response(prefix, tail=body):
+                with opened(url, route, **kwargs) as response:
+                    yield response
+        with patch.object(transport, "open", side_effect=route_response):
+            self.assertEqual(transport.fetch_bytes(API, timeout=0.07), b"{}")
+        self.assertEqual(attempts, ["direct", "gh-proxy"])
+
+    def test_range_query_deadline_falls_back_instead_of_waiting_like_a_download(self):
+        transport = GitHubTransport(None, "auto")
+        opened, attempts = transport.open, []
+        @contextmanager
+        def route_response(url, route, **kwargs):
+            attempts.append(route)
+            prefix = b"HTTP/1.1 206 Partial Content\r\nX-Slow: " if route == "direct" else b"HTTP/1.1 206 Partial Content\r\nContent-Length: 3\r\nContent-Range: bytes 7-9/10\r\n\r\n"
+            body = b"x" * 200 if route == "direct" else b"zip"
+            with trickling_response(prefix, tail=body):
+                with opened(url, route, **kwargs) as response:
+                    yield response
+        with patch.object(transport, "open", side_effect=route_response):
+            self.assertEqual(transport.fetch_range(ZIP, None, 3, timeout=0.07), (b"zip", 7, 10))
+        self.assertEqual(attempts, ["direct", "gh-proxy"])
+
+    def test_store_headers_are_bounded_by_query_deadline(self):
+        import main
+        with patch.object(sideload.http_client, "QUERY_SECONDS", 0.07), trickling_response(b"HTTP/1.1 200 OK\r\nX-Slow: "):
+            start = time.monotonic()
+            with self.assertRaisesRegex(RuntimeError, "商店目录等待响应"):
+                sideload.http_client._fetch_json(sideload.http_client.STORE_URL)
+        self.assertLess(time.monotonic() - start, 0.3)
+
+    def test_query_bodies_can_stream_longer_than_the_response_wait(self):
+        import main
+        body = b'{"value":"0123456789"}'
+        for kind in ("json", "range", "store", "chunked"):
+            with self.subTest(kind=kind):
+                if kind == "range":
+                    prefix = f"HTTP/1.1 206 Partial Content\r\nContent-Length: {len(body)}\r\nContent-Range: bytes 0-{len(body)-1}/{len(body)}\r\n\r\n".encode()
+                elif kind == "chunked":
+                    prefix = f"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{len(body):x}\r\n".encode()
+                else:
+                    prefix = f"HTTP/1.1 200 OK\r\nContent-Length: {len(body)}\r\n\r\n".encode()
+                wire = body + b"\r\n0\r\n\r\n" if kind == "chunked" else body
+                with patch.object(sideload.http_client, "QUERY_SECONDS", 0.07), trickling_response(prefix, tail=wire, interval=0.005):
+                    if kind == "range":
+                        self.assertEqual(GitHubTransport(None).fetch_range(ZIP, 0, len(body)-1, timeout=0.07), (body, 0, len(body)))
+                    elif kind == "store":
+                        self.assertEqual(sideload.http_client._fetch_json(sideload.http_client.STORE_URL), {"value": "0123456789"})
+                    else:
+                        self.assertEqual(GitHubTransport(None).fetch_bytes(API, timeout=0.07), body)
+
+    def test_stalled_body_falls_back_without_mixing_partial_response(self):
+        for kind in ("json", "range"):
+            with self.subTest(kind=kind):
+                transport = GitHubTransport(None, "auto")
+                opened, attempts = transport.open, []
+                @contextmanager
+                def route_response(url, route, **kwargs):
+                    attempts.append(route)
+                    prefix = b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-1/2\r\n" if kind == "range" else b"HTTP/1.1 200 OK\r\n"
+                    prefix += b"Content-Length: 2\r\n\r\n"
+                    with trickling_response(prefix + (b"x" if route == "direct" else b""), tail=b"x" if route == "direct" else b"{}", interval=0.15 if route == "direct" else 0.003):
+                        with opened(url, route, **kwargs) as response:
+                            yield response
+                with patch.object(transport, "open", side_effect=route_response):
+                    if kind == "range":
+                        self.assertEqual(transport.fetch_range(ZIP, 0, 1, timeout=0.07), (b"{}", 0, 2))
+                    else:
+                        self.assertEqual(transport.fetch_bytes(API, timeout=0.07), b"{}")
+                self.assertEqual(attempts, ["direct", "gh-proxy"])
 
     def test_dns_deadline_cancel_capacity_and_late_completion_are_bounded(self):
         release = threading.Event()
@@ -283,8 +367,8 @@ class TransportTests(unittest.TestCase):
                 next(connects)(connection)
             with patch.object(network._HTTPSConnection, "connect", connect):
                 start = time.monotonic()
-                with self.assertRaisesRegex(RuntimeError, "总时限"):
-                    GitHubTransport(None).fetch_bytes(API, deadline=0.07)
+                with self.assertRaisesRegex(RuntimeError, "等待响应超时"):
+                    GitHubTransport(None).fetch_bytes(API, timeout=0.07)
                 self.assertLess(time.monotonic() - start, 0.3)
         self.assertEqual(len(budgets), 2)
         self.assertIs(budgets[0], budgets[1])
@@ -313,3 +397,21 @@ class TransportTests(unittest.TestCase):
                 finally:
                     if cancelled:
                         timer.join()
+
+    def test_range_read_uses_partial_content_and_does_not_accept_a_larger_full_body(self):
+        body = b"hello"
+        response = Response(body, ZIP, {"Content-Range": "bytes 0-4/10"})
+        response.status = 206
+        opener = Mock(open=Mock(return_value=response))
+        with patch.object(network.urllib.request, "build_opener", return_value=opener):
+            data, start, total = GitHubTransport(None).fetch_range(ZIP, 0, 4)
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.get_header("Range"), "bytes=0-4")
+        self.assertEqual((data, start, total), (body, 0, 10))
+        full = Response(b"x" * 20, ZIP, {"Content-Length": "20"})
+        full.status = 200
+        opener.open.return_value = full
+        with patch.object(network.urllib.request, "build_opener", return_value=opener):
+            with self.assertRaisesRegex(RuntimeError, "范围|过大"):
+                GitHubTransport(None).fetch_range(ZIP, 0, 4)
+

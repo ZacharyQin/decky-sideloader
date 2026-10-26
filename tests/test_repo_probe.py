@@ -6,9 +6,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'py_modules'))
-import repo_probe
-from repo_probe import probe_repository
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
+from sideload import repo_probe
+from sideload.repo_probe import probe_repository
 
 
 def repository(files, *, truncated=False):
@@ -39,7 +39,7 @@ class RepositoryProbeTests(unittest.TestCase):
         result = probe_repository('https://github.com/acme/example', fetch)
         self.assertEqual(result['repo'], 'acme/example')
         self.assertEqual(result['tree_sha'], 'a' * 40)
-        self.assertEqual(result['plugins'], [dict(path='', name='Example', package_name='example', version='1.0.0', evidence=['依赖 @decky/api'])])
+        self.assertEqual(result['plugins'], [dict(path='', name='Example', package_name='example', version='1.0.0', evidence=['依赖 @decky/api'], requires_root=False)])
         self.assertTrue(all(c.args[0].startswith('https://api.github.com/repos/acme/example/git/') for c in fetch.call_args_list))
         self.assertTrue(all(c.kwargs['max_bytes'] > 0 for c in fetch.call_args_list))
 
@@ -47,9 +47,12 @@ class RepositoryProbeTests(unittest.TestCase):
         files = {'package.json': {'name': 'workspace', 'private': True}}
         files.update(plugin_files('apps/first', 'First', 'first'))
         files.update(plugin_files('plugins/second', 'Second', 'second'))
+        files['apps/first/plugin.json']['flags'] = ['debug', 'root']
+        files['plugins/second/plugin.json']['flags'] = ['debug']
         fetch, _ = repository(files)
         result = probe_repository('acme/mono', fetch)
         self.assertEqual([(p['path'], p['name'], p['package_name']) for p in result['plugins']], [('apps/first', 'First', 'first'), ('plugins/second', 'Second', 'second')])
+        self.assertEqual([(p['path'], p['requires_root']) for p in result['plugins']], [('apps/first', True), ('plugins/second', False)])
 
     def test_workspace_hoisted_dependencies_and_backend_legacy_marker(self):
         files = {'package.json': dict(workspaces=['plugins/*'], devDependencies={'@decky/ui': '^4'})}

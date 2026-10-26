@@ -32,3 +32,5 @@ out/*
 cli/
 cli/*
 cli/decky
+
+HANDOFF.md

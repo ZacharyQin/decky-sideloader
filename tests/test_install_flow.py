@@ -10,13 +10,14 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from zipfile import ZipFile
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "py_modules"))
-import install_flow
-from install_flow import InstallFlow
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+import sideload
+from sideload import install_flow
+from sideload.install_flow import InstallFlow
 from test_install_ops import make_package
 from test_transport import trickling_response
-import github_transport as network
-from install_ops import download_asset
+from sideload import github_transport as network
+from sideload.install_ops import download_asset
 
 URL = "https://github.com/acme/example/releases/download/v2/example.zip"
 
@@ -35,7 +36,7 @@ class InstallFlowTests(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(self.flow.unload)
 
     def new_flow(self):
-        return InstallFlow(str(self.home), str(self.home / "runtime"), "GitHub Sideload", "github-sideload", self.releases, lambda: None)
+        return InstallFlow(str(self.home), str(self.home / "runtime"), "decky-sideloader", "decky-sideloader", self.releases, lambda: None)
 
     async def prepared(self, existing=None):
         await self.flow.prepare("acme/example", "v2", URL, existing)
@@ -107,6 +108,31 @@ class InstallFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.flow.file.read_bytes(), before)
         self.assertEqual((await self.new_flow().status())["download"]["received"], 10)
 
+    async def test_dependency_is_part_of_final_verification_and_both_archives_are_cleaned(self):
+        from test_remote_binaries import Transport, dependency
+        from sideload import remote_binaries
+        make_package(self.source, extra={"example/package.json": json.dumps({"name": "example", "version": "2.0.0", "remote_binary": [dependency()]})})
+        with patch.object(remote_binaries, "GitHubTransport", return_value=Transport()):
+            op = await self.prepared()
+        self.assertEqual(op["stage"], "ready")
+        self.assertEqual(op["dependency_download"]["status"], "complete")
+        archive_path = Path(op["artifact"][7:])
+        await self.flow.submit(op["id"])
+        await self.flow.event(op["id"], "prompt", "Example", "request-1", op["package"]["sha256"])
+        await self.flow.event(op["id"], "start", "Example")
+        with ZipFile(archive_path) as archive:
+            archive.extractall(self.home / "plugins")
+        (self.home / "plugins/example/bin/engine.bin").unlink()
+        await self.flow.event(op["id"], "finish", "Example")
+        finalize = Mock()
+        result = await self.flow.status(finalize)
+        self.assertEqual(result["stage"], "failed")
+        finalize.assert_not_called()
+        self.assertTrue(archive_path.with_name("source.zip").is_file())
+        await self.flow.delete_package(op["id"])
+        self.assertFalse(archive_path.exists())
+        self.assertFalse(archive_path.with_name("source.zip").exists())
+
     async def test_new_install_matches_probed_plugin_and_package_names(self):
         target = {"path": "plugins/example", "name": "Example", "package_name": "example", "tree_sha": "a" * 40}
         make_package(self.source, extra={"example/package.json": json.dumps({"name": "other-plugin", "version": "2.0.0"})})
@@ -140,7 +166,7 @@ class InstallFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("hashes", op["package"])
 
     async def test_artifact_uses_loader_raw_file_path_with_spaces(self):
-        flow = InstallFlow(str(self.home), str(self.home / "runtime with spaces"), "GitHub Sideload", "github-sideload", self.releases, lambda: None)
+        flow = InstallFlow(str(self.home), str(self.home / "runtime with spaces"), "decky-sideloader", "decky-sideloader", self.releases, lambda: None)
         await flow.prepare("acme/example", "v2", URL, None)
         await flow.task
         result = await flow.status()
@@ -309,8 +335,8 @@ class InstallFlowTests(unittest.IsolatedAsyncioTestCase):
         plugin = main.Plugin()
         plugin._flow = self.flow
         settings_path = str(self.home / "self-settings.json")
-        with patch.object(main, "_settings_path", return_value=settings_path):
-            with patch.object(main, "save_settings", side_effect=OSError("binding write failed")), self.assertRaises(OSError):
+        with patch.object(sideload.installation_api, "_settings_path", return_value=settings_path):
+            with patch.object(sideload.installation_api, "save_settings", side_effect=OSError("binding write failed")), self.assertRaises(OSError):
                 await plugin.get_operation()
             self.assertFalse(self.flow.operation["binding_saved"])
             with self.assertRaises(RuntimeError):
@@ -319,8 +345,8 @@ class InstallFlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["id"], op["id"])
             self.assertEqual(result["stage"], "closed")
             self.assertTrue(result["binding_saved"])
-            self.assertEqual(main.load_settings(settings_path)["bindings"]["Example"]["repo"], "acme/example")
-            with patch.object(main, "save_settings") as save:
+            self.assertEqual(sideload.persist.load_settings(settings_path)["bindings"]["Example"]["repo"], "acme/example")
+            with patch.object(sideload.installation_api, "save_settings") as save:
                 await plugin.get_operation()
             save.assert_not_called()
 
@@ -363,6 +389,61 @@ class InstallFlowTests(unittest.IsolatedAsyncioTestCase):
         await self.flow.event(op["id"], "finish", "Example")
         self.assertEqual((await self.flow.status(Mock()))["stage"], "unknown")
         self.assertFalse(self.flow.operation["saw_finish"])
+
+    async def test_files_after_timeout_without_finish_never_become_success(self):
+        op = await self.prepared()
+        await self.flow.submit(op["id"])
+        await self.flow.event(op["id"], "prompt", "Example", "request-1", op["package"]["sha256"])
+        await self.flow.event(op["id"], "start", "Example")
+        with ZipFile(self.source) as archive:
+            archive.extractall(self.home / "plugins")
+        self.flow._update(submitted_at=time.time() - 121)
+        finalize = Mock()
+        result = await self.flow.status(finalize)
+        self.assertEqual(result["stage"], "unknown")
+        self.assertIsNone(result["outcome"])
+        finalize.assert_not_called()
+        await self.flow.event(op["id"], "finish", "Example")
+        self.assertEqual((await self.flow.status(finalize))["outcome"], "success")
+
+    async def test_native_return_without_finish_is_failed_with_last_observed_phase(self):
+        op = await self.prepared()
+        await self.flow.submit(op["id"])
+        await self.flow.event(op["id"], "prompt", "Example", "request-1", op["package"]["sha256"])
+        await self.flow.event(op["id"], "start", "Example")
+        await self.flow.event(op["id"], "progress", "Example", "Store.download_progress_info.download_remote")
+        with ZipFile(self.source) as archive:
+            archive.extractall(self.home / "plugins")
+        await self.flow.event(op["id"], "confirm_returned", "Example", "", "unrelated-request")
+        self.assertEqual((await self.flow.status())["stage"], "installing")
+        await self.flow.event(op["id"], "confirm_returned", "Example", "", "request-1")
+        result = await self.flow.status(Mock())
+        self.assertEqual(result["stage"], "failed")
+        self.assertIsNone(result["outcome"])
+        self.assertIn("检查额外依赖", result["error"])
+        self.assertEqual(result["observations"][-1]["status"], "failed")
+        await self.flow.event(op["id"], "finish", "Example")
+        self.assertEqual((await self.new_flow().status())["stage"], "failed")
+
+    async def test_native_exception_records_exact_reason_and_never_finalizes(self):
+        op = await self.prepared()
+        await self.flow.submit(op["id"])
+        await self.flow.event(op["id"], "prompt", "Example", "request-1", op["package"]["sha256"])
+        await self.flow.event(op["id"], "start", "Example")
+        await self.flow.event(op["id"], "install_error", "Example", "disk full", "request-1")
+        finalize = Mock()
+        result = await self.flow.status(finalize)
+        self.assertEqual(result["stage"], "failed")
+        self.assertEqual(result["error"], "disk full")
+        finalize.assert_not_called()
+
+    async def test_reload_revokes_legacy_timeout_success_without_finish(self):
+        await self.prepared()
+        self.flow._update(stage="closed", outcome="success", saw_start=True, saw_finish=False)
+        result = await self.new_flow().status()
+        self.assertEqual(result["stage"], "unknown")
+        self.assertIsNone(result["outcome"])
+
 
     async def test_same_name_conflicting_request_and_dispatch_error_block_success(self):
         for conflict in ("request", "hash", "dispatch"):
@@ -966,6 +1047,29 @@ class InstallFlowTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await self.flow.dismiss(op["id"])
 
+
+    async def test_delete_package_waits_until_terminal_and_keeps_the_backup(self):
+        op = await self.prepared()
+        directory = Path(op["directory"])
+        archive = directory / "plugin.zip"
+        backup = directory / "data-backup.zip"
+        backup.write_bytes(b"backup")
+        with self.assertRaises(RuntimeError):
+            await self.flow.delete_package(op["id"])
+        self.assertTrue(archive.is_file())
+        await self.flow.close(op["id"])
+        deleted = await self.flow.delete_package(op["id"])
+        self.assertTrue(deleted["artifact_deleted"])
+        self.assertFalse(archive.exists())
+        self.assertEqual(backup.read_bytes(), b"backup")
+        self.assertEqual((await self.flow.delete_package(op["id"]))["artifact_deleted"], True)
+        self.flow._update(artifact_deleted=False)
+        archive.symlink_to(backup)
+        with self.assertRaises(RuntimeError):
+            await self.flow.delete_package(op["id"])
+        self.assertTrue(archive.is_symlink())
+        self.assertFalse(self.flow.operation.get("artifact_deleted"))
+
     async def test_task52_dismiss_success_retains_all_evidence_backup_binding_and_outcome(self):
         await self.verified_operation()
         closed = await self.flow.status(Mock())
@@ -1003,3 +1107,46 @@ class InstallFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["stage"], "cancelled")
         self.assertTrue(result["uninstall_result_received"])
         self.assertTrue(Path(result["backup"]["archive"]).is_file())
+
+    async def test_versionless_zip_is_refused_before_download(self):
+        archive = self.home / "bare.zip"
+        with ZipFile(archive, "w") as package:
+            package.writestr("example/plugin.json", json.dumps({"name": "Example"}))
+        data = archive.read_bytes()
+
+        def fetch_range(_url, start, end):
+            if start is None:
+                chunk = data if end >= len(data) else data[-end:]
+                return chunk, len(data) - len(chunk), len(data)
+            return data[start:end + 1], start, len(data)
+
+        transport = Mock(mode="direct", fetch_range=fetch_range)
+        flow = InstallFlow(str(self.home), str(self.home / "runtime-range"), "decky-sideloader", "decky-sideloader", self.releases, lambda: None, lambda: transport)
+        self.addAsyncCleanup(flow.unload)
+        with patch.object(install_flow, "download_asset") as download:
+            await flow.prepare("acme/example", "v2", URL, None)
+            await flow.task
+        self.assertEqual(flow.operation["stage"], "failed")
+        self.assertIn("没有可读取的版本", flow.operation["error"])
+        download.assert_not_called()
+
+    async def test_completed_download_continues_without_fetching_again(self):
+        archive = make_package(self.home / "spaced.zip", name="DLSS Enabler", folder="DLSS Enabler")
+        with ZipFile(archive) as package:
+            package.extractall(self.home / "plugins")
+        directory = self.home / "runtime" / "installations" / "job"
+        directory.mkdir(parents=True)
+        shutil.copyfile(archive, directory / "plugin.zip")
+        self.flow.operation = {"id": "job", "stage": "failed", "repo": "acme/example", "tag": "v2", "existing_name": "DLSS Enabler", "target": None,
+                               "download": {"status": "complete", "received": 1, "total": 1, "route": "direct", "attempt": 1},
+                               "error": "插件目录名无效", "directory": str(directory), "artifact": "file://" + str(directory / "plugin.zip"),
+                               "request_id": None, "saw_start": False, "saw_finish": False, "binding_saved": False, "mode": "install",
+                               "outcome": None, "backup": None, "package": None, "created_at": "now"}
+        self.flow._update()
+        with patch.object(install_flow, "download_asset") as download:
+            await self.flow.continue_prepare("job")
+            await self.flow.task
+        download.assert_not_called()
+        self.assertEqual(self.flow.operation["stage"], "ready")
+        self.assertEqual(self.flow.operation["package"]["folder"], "DLSS Enabler")
+

@@ -5,8 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'py_modules'))
-from catalog import Catalog
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
+import sideload
+from sideload.catalog import Catalog
 
 
 class LocalCatalogTests(unittest.TestCase):
@@ -56,7 +57,7 @@ class LocalCatalogTests(unittest.TestCase):
         self.fetch.return_value=(set(),'offline'); self.catalog.resolve(refresh=True,plugins=[self.plugin])
         self.assertEqual(self.path.read_bytes(),before)
         self.fetch.return_value=({'Local'},None)
-        with patch('catalog.save_settings',side_effect=OSError('disk full')):
+        with patch('sideload.catalog.save_settings', side_effect=OSError('disk full')):
             _,status,_=self.catalog.resolve(refresh=True,plugins=[self.plugin])
         self.assertEqual(self.path.read_bytes(),before); self.assertIs(self.catalog.memory_for(self.plugin)['in_store'],False)
         self.assertTrue(status['warning'])
@@ -76,7 +77,7 @@ class LocalCatalogTests(unittest.TestCase):
         self.path.unlink(); self.path.hardlink_to(foreign); self.assertTrue(self.reload().memory_error)
         self.path.unlink(); self.path.write_text('{bad'); self.assertTrue(self.reload().memory_error)
         self.path.write_bytes(before)
-        with patch('catalog.MAX_CATALOG_BYTES',1):self.assertTrue(self.reload().memory_error)
+        with patch('sideload.catalog.MAX_CATALOG_BYTES', 1):self.assertTrue(self.reload().memory_error)
 
 
 class LocalManagementTests(unittest.IsolatedAsyncioTestCase):
@@ -86,7 +87,7 @@ class LocalManagementTests(unittest.IsolatedAsyncioTestCase):
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
         sys.modules.setdefault("decky", types.ModuleType("decky"))
         import main
-        from persist import save_settings
+        from sideload.persist import save_settings
         self.main = main
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name); self.folder = self.home / "plugins" / "one"; self.folder.mkdir(parents=True)
@@ -94,11 +95,15 @@ class LocalManagementTests(unittest.IsolatedAsyncioTestCase):
         (self.folder / "package.json").write_text('{"name":"one-package","version":"1","repository":"acme/one"}')
         settings_dir = self.home / "settings" / "self"; settings_dir.mkdir(parents=True)
         (self.home / "settings" / "loader.json").write_text('{"frozenPlugins":[]}')
-        patcher = patch.multiple(main.decky, create=True, DECKY_HOME=str(self.home), DECKY_PLUGIN_NAME="GitHub Sideload", DECKY_PLUGIN_SETTINGS_DIR=str(settings_dir), logger=Mock())
+        patcher = patch.multiple(main.decky, create=True, DECKY_HOME=str(self.home), DECKY_PLUGIN_NAME="decky-sideloader", DECKY_PLUGIN_RUNTIME_DIR=str(self.home / "data" / "self"), DECKY_PLUGIN_SETTINGS_DIR=str(settings_dir), logger=Mock())
         patcher.start(); self.addCleanup(patcher.stop)
-        save_settings(main._settings_path(), {"bindings":{}})
+        save_settings(sideload.paths._settings_path(), {"bindings":{}})
         self.fetch = Mock(return_value=({"Other"}, None)); self.clock=1000
         self.plugin = main.Plugin(); self.plugin._catalog = Catalog(settings_dir / "catalog.json", self.fetch, Mock(), lambda:self.clock)
+        self.native_names = []
+        async def native(refresh=False):
+            return ({"ok": True, "plugins": [{"name": "One", "version": "1", "load_type": 1, "disabled": False}]}, self.native_names)
+        self.plugin._read_native_management = native
 
     async def row(self):
         return (await self.plugin.list_sideload_plugins())["plugins"][0]
@@ -114,10 +119,11 @@ class LocalManagementTests(unittest.IsolatedAsyncioTestCase):
         self.fetch.assert_called_once()
 
     async def test_known_store_and_legacy_binding_survive_removed_listing_and_restart_without_consent(self):
-        from persist import save_settings
+        from sideload.persist import save_settings
         self.fetch.return_value=({"One"},None)
+        self.native_names = ["One"]
         await self.plugin.list_sideload_plugins(True)
-        save_settings(self.main._settings_path(), {"bindings":{"One":{"repo":"old/one","overridden":True}}})
+        save_settings(sideload.paths._settings_path(), {"bindings":{"One":{"repo":"old/one","overridden":True}}})
         self.fetch.return_value=({"Other"},None)
         await self.plugin.list_sideload_plugins(True)
         self.clock += 30*86400
@@ -129,9 +135,9 @@ class LocalManagementTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse((await self.row())["sideload"])
 
     async def test_replacement_identity_requires_explicit_binding_confirmation(self):
-        from persist import save_settings
+        from sideload.persist import save_settings
         await self.plugin.list_sideload_plugins(True)
-        save_settings(self.main._settings_path(), {"bindings":{"One":{"repo":"acme/one","overridden":True}}})
+        save_settings(sideload.paths._settings_path(), {"bindings":{"One":{"repo":"acme/one","overridden":True}}})
         self.folder.rename(self.folder.with_name("replacement"))
         self.assertFalse((await self.row())["sideload"])
         await self.plugin.set_binding("One","acme/one")
@@ -207,6 +213,6 @@ class LocalManagementTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.plugin._catalog.path.exists()); self.assertIsNone(self.plugin._catalog_worker)
 
     async def test_malformed_binding_identity_is_visible_but_does_not_grant_permission(self):
-        from persist import save_settings
-        save_settings(self.main._settings_path(),{"bindings":{"One":{"repo":"acme/one","folder":"one","package_name":"one-package","package_repo":[]}}})
+        from sideload.persist import save_settings
+        save_settings(sideload.paths._settings_path(),{"bindings":{"One":{"repo":"acme/one","folder":"one","package_name":"one-package","package_repo":[]}}})
         row=await self.row(); self.assertTrue(row["memory_changed"]); self.assertFalse(row["sideload"])

@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { cancelPendingInstall, installFromArtifact, InstallType, listenForInstallEvents, probeLoaderChannel, uninstallForReinstall } from "../src/loaderBridge";
 import type { InstallOperation } from "../src/types";
+import { setLocale } from "../src/i18n";
+beforeEach(() => setLocale("zh-cn"));
 
 const original = globalThis.window;
 afterEach(() => { globalThis.window = original; });
@@ -15,7 +17,7 @@ function setup() {
 }
 const operation = (): InstallOperation => ({
   id: "operation", stage: "awaiting", repo: "acme/example", tag: "v2", existing_name: null, created_at: "now", error: null,
-  artifact: "file:///home/deck/homebrew/data/github-sideload/installations/id/plugin.zip", directory: "", request_id: null, saw_finish: false,
+  artifact: "file:///home/deck/homebrew/data/decky-sideloader/installations/id/plugin.zip", directory: "", request_id: null, saw_finish: false,
   binding_saved: false, backup: null, package: { name: "Example", folder: "example", version: "2.0.0", sha256: "a".repeat(64) },
 });
 describe("Loader bridge", () => {
@@ -50,6 +52,39 @@ describe("Loader bridge", () => {
     globalThis.window = { DeckyBackend: { call: mock() } } as unknown as Window;
     expect(probeLoaderChannel().ok).toBe(false);
   });
+});
+
+test("native failure keeps request identity and restores the original call on disposal", async () => {
+  const { call, events } = setup();
+  const observed: unknown[][] = [];
+  const stop = listenForInstallEvents((...event) => observed.push(event));
+  const backend = (window as any).DeckyBackend;
+  events.get("loader/add_plugin_install_prompt")!("Example", "2", "request-1", "sha");
+  events.get("loader/plugin_download_start")!("Example");
+  events.get("loader/plugin_download_info")!(95, "Store.download_progress_info.download_remote");
+  call.mockImplementationOnce(async () => { throw new Error("disk full"); });
+  await expect(backend.call("utilities/confirm_plugin_install", "request-1")).rejects.toThrow("disk full");
+  expect(observed).toContainEqual(["install_error", "Example", "disk full", "request-1"]);
+  expect(observed.some(([kind]) => kind === "finish" || kind === "confirm_returned")).toBe(false);
+  const count = observed.length;
+  events.get("loader/plugin_download_info")!(100, "late");
+  expect(observed.length).toBe(count);
+  stop();
+  expect(backend.call).toBe(call);
+});
+
+test("native return without a finish is distinct from completion and unrelated requests are ignored", async () => {
+  const { events } = setup();
+  const observed: unknown[][] = [];
+  const stop = listenForInstallEvents((...event) => observed.push(event));
+  const backend = (window as any).DeckyBackend;
+  await backend.call("utilities/confirm_plugin_install", "unrelated");
+  expect(observed).toEqual([]);
+  events.get("loader/add_plugin_install_prompt")!("Example", "2", "request-1", "sha");
+  await backend.call("utilities/confirm_plugin_install", "request-1");
+  expect(observed).toContainEqual(["confirm_returned", "Example", "", "request-1"]);
+  expect(observed.some(([kind]) => kind === "finish")).toBe(false);
+  stop();
 });
 
 

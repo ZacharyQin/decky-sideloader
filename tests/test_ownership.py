@@ -9,13 +9,14 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-for path in (ROOT, ROOT / "py_modules"):
+for path in (ROOT, ROOT / "backend"):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 sys.modules.setdefault("decky", types.ModuleType("decky"))
 import main
-from ownership import Ownership, read_frozen
-from persist import load_settings, save_settings
+import sideload
+from sideload.ownership import Ownership, read_frozen
+from sideload.persist import load_settings, save_settings
 
 
 class OwnershipTests(unittest.IsolatedAsyncioTestCase):
@@ -30,18 +31,21 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         self.loader = self.home / "settings" / "loader.json"
         self.loader.parent.mkdir()
         self.freeze([])
-        patcher = patch.multiple(main.decky, create=True, DECKY_HOME=str(self.home), DECKY_PLUGIN_NAME="GitHub Sideload",
-                                 DECKY_PLUGIN_SETTINGS_DIR=str(self.home / "settings" / "self"), logger=Mock())
+        patcher = patch.multiple(main.decky, create=True, DECKY_HOME=str(self.home), DECKY_PLUGIN_NAME="decky-sideloader",
+                                 DECKY_PLUGIN_RUNTIME_DIR=str(self.home / "data" / "self"), DECKY_PLUGIN_SETTINGS_DIR=str(self.home / "settings" / "self"), logger=Mock())
         patcher.start(); self.addCleanup(patcher.stop)
         self.plugin = main.Plugin()
         self.names, self.store_ok = {"One"}, True
         def resolve():
             return self.names, {"source": "live" if self.store_ok else "unavailable", "stale": False, "warning": None, "timestamp": 1}, []
         self.plugin._catalog = Mock(resolve=Mock(side_effect=resolve))
+        async def native(refresh=False):
+            return ({"ok": True, "plugins": [{"name": name, "version": "1", "load_type": 1, "disabled": False} for name in self.names | {"One"}]}, list(self.names) if self.store_ok else None)
+        self.plugin._read_native_management = native
         self.owner = self.plugin._ownership()
-        settings = load_settings(main._settings_path())
+        settings = load_settings(sideload.paths._settings_path())
         settings["bindings"]["One"] = {"repo": "legacy/One", "overridden": True}
-        save_settings(main._settings_path(), settings)
+        save_settings(sideload.paths._settings_path(), settings)
 
     def freeze(self, names):
         self.loader.write_text(json.dumps({"frozenPlugins": names, "unrelated": {"private": "never returned"}}))
@@ -70,7 +74,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         for call in (self.plugin.set_binding("One", "other/repo"), self.plugin.clear_binding("One"), self.plugin.authorize_plugin_mutation("One"), self.plugin.prepare_install("acme/One", "v1", "url", "One")):
             with self.assertRaises(RuntimeError):
                 await call
-        self.assertEqual(load_settings(main._settings_path())["bindings"]["One"]["repo"], "legacy/One")
+        self.assertEqual(load_settings(sideload.paths._settings_path())["bindings"]["One"]["repo"], "legacy/One")
 
     async def test_intent_precedes_effect_and_native_completion_is_not_activation(self):
         intent = await self.plugin.begin_store_ownership("One", "one", "acme/One", "takeover")
@@ -92,12 +96,12 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(read_frozen(str(self.home)), ["Other", "One"])
 
     async def test_persistence_failure_does_not_publish_or_lose_old_ledger(self):
-        with patch("ownership.save_settings", side_effect=OSError("disk full")), self.assertRaises(OSError):
+        with patch("sideload.ownership.save_settings", side_effect=OSError("disk full")), self.assertRaises(OSError):
             await self.plugin.begin_store_ownership("One", "one", "acme/One", "takeover")
         self.assertEqual(self.owner.load()["entries"], [])
         await self.takeover()
         before = self.owner.path.read_bytes()
-        with patch("ownership.save_settings", side_effect=OSError("disk full")), self.assertRaises(OSError):
+        with patch("sideload.ownership.save_settings", side_effect=OSError("disk full")), self.assertRaises(OSError):
             await self.plugin.begin_store_ownership("One", "one", "acme/One", "return")
         self.assertEqual(self.owner.path.read_bytes(), before)
         self.assertEqual(read_frozen(str(self.home)), ["One", "Other"])
@@ -120,7 +124,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(row["ownership"]["state"], "store")
             self.assertFalse(row["sideload"])
             self.assertTrue(self.folder.is_dir())
-            self.assertEqual(load_settings(main._settings_path())["bindings"]["One"]["repo"], "legacy/One")
+            self.assertEqual(load_settings(sideload.paths._settings_path())["bindings"]["One"]["repo"], "legacy/One")
             self.assertEqual(read_frozen(str(self.home)), ["Other", "Concurrent"] + (["One"] if prior else []))
 
     async def test_partial_failure_reload_and_explicit_readback_never_auto_retry(self):
@@ -144,15 +148,15 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await self.plugin.ownership_native_step(intent["id"], "complete")
 
-    async def test_unknown_membership_is_not_consent_but_explicit_nonstore_repair_survives(self):
+    async def test_unknown_native_capability_is_not_consent_even_with_explicit_binding(self):
         self.store_ok = False
-        self.assertEqual((await self.row())["ownership"]["state"], "repair")
+        self.assertEqual((await self.row())["ownership"]["state"], "unknown")
         with self.assertRaises(RuntimeError):
             await self.plugin.begin_store_ownership("One", "one", "acme/One", "takeover")
-        save_settings(main._settings_path(), load_settings(str(self.home / "absent-settings.json")))
+        save_settings(sideload.paths._settings_path(), load_settings(str(self.home / "absent-settings.json")))
         self.assertFalse((await self.row())["sideload"])
         await self.plugin.set_binding("One", "repair/One")
-        self.assertTrue((await self.row())["sideload"])
+        self.assertFalse((await self.row())["sideload"])
         self.store_ok, self.names = True, set()
         self.assertEqual((await self.row())["ownership"]["state"], "nonstore")
         await self.plugin.clear_binding("One")
@@ -160,7 +164,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue((await self.row())["sideload"])
 
     async def test_duplicate_name_changed_folder_self_and_active_target_block_changes(self):
-        for name, folder in (("missing", "one"), ("GitHub Sideload", "one"), ("One", "wrong")):
+        for name, folder in (("missing", "one"), ("decky-sideloader", "one"), ("One", "wrong")):
             with self.assertRaises(RuntimeError):
                 await self.plugin.begin_store_ownership(name, folder, "acme/One", "takeover")
         other = self.home / "plugins" / "duplicate"
@@ -219,7 +223,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         self.plugin._flow = Mock(status=AsyncMock(side_effect=status))
         await self.plugin.get_operation()
         self.assertEqual(self.owner.path.read_bytes(), before)
-        self.assertEqual(load_settings(main._settings_path())["bindings"]["One"], {"repo": "acme/new", "overridden": True})
+        self.assertEqual(load_settings(sideload.paths._settings_path())["bindings"]["One"], {"repo": "acme/new", "overridden": True})
         self.assertEqual((await self.row())["repo"], "acme/One")
 
     async def test_check_finishing_after_return_returns_current_ineligible_row(self):
@@ -306,7 +310,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         limit = len(before) + 1
         self.assertLess(len(json.dumps(candidate).encode()), limit)
         self.assertGreater(len(json.dumps(candidate, ensure_ascii=False, indent=2).encode("utf-8")), limit)
-        with patch("ownership.MAX_BYTES", limit), self.assertRaisesRegex(RuntimeError, "容量"):
+        with patch("sideload.ownership.MAX_BYTES", limit), self.assertRaisesRegex(RuntimeError, "容量"):
             self.owner.save(candidate)
         self.assertEqual(self.owner.path.read_bytes(), before)
         self.assertEqual(self.owner.load()["entries"][0]["name"], "One")
@@ -314,7 +318,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
     async def test_owned_repo_rejects_other_prepare_and_old_operations_without_mutating_evidence(self):
         await self.takeover()
         ledger_before = self.owner.path.read_bytes()
-        settings_before = Path(main._settings_path()).read_bytes()
+        settings_before = Path(sideload.paths._settings_path()).read_bytes()
         operation = {"id": "job", "stage": "ready", "mode": "reinstall", "repo": "other/One", "existing_name": "One",
                      "package": {"name": "One", "folder": "one"}, "saw_finish": False, "outcome": None}
         flow = Mock(operation=operation, prepare=AsyncMock(), submit=AsyncMock(), claim_uninstall=AsyncMock())
@@ -339,7 +343,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         flow.claim_uninstall.assert_not_awaited()
         self.assertEqual(operation, snapshot)
         self.assertEqual(self.owner.path.read_bytes(), ledger_before)
-        self.assertEqual(Path(main._settings_path()).read_bytes(), settings_before)
+        self.assertEqual(Path(sideload.paths._settings_path()).read_bytes(), settings_before)
 
     async def test_owned_confirmed_repo_allows_normal_update_and_reinstall(self):
         await self.takeover()
@@ -371,7 +375,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         self.freeze(["One"])
         await self.plugin.ownership_native_step(intent["id"], "confirming")
         before = self.owner.path.read_bytes()
-        with patch("ownership.save_settings", side_effect=OSError("activation full")), self.assertRaises(OSError):
+        with patch("sideload.ownership.save_settings", side_effect=OSError("activation full")), self.assertRaises(OSError):
             await self.plugin.ownership_native_step(intent["id"], "complete")
         self.assertEqual(self.owner.path.read_bytes(), before)
         self.assertFalse((await self.row())["sideload"])

@@ -1,8 +1,7 @@
-// Semantic index:
-// - participant: docs/upstream-conflict/sideload/plugin-management.md -- reuse unique loaded plugin icons as decoration without inferring package or store identity.
 import { Component, cloneElement, Fragment, isValidElement, type ReactElement } from "react";
 import { FaPuzzlePiece } from "react-icons/fa";
 import type { PluginRow } from "./types";
+import { recordFrontendError } from "./diagnosticsController";
 
 function loadedIcon(plugin: PluginRow): ReactElement | null {
   if (["ambiguous", "disabled", "unregistered"].includes(plugin.management?.state ?? "")) return null;
@@ -17,6 +16,7 @@ function loadedIcon(plugin: PluginRow): ReactElement | null {
 class IconBoundary extends Component<{ icon: ReactElement | null }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error: unknown) { recordFrontendError(error, "icon"); }
   componentDidUpdate(previous: Readonly<{ icon: ReactElement | null }>) {
     if (previous.icon !== this.props.icon && this.state.failed) this.setState({ failed: false });
   }

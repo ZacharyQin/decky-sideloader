@@ -4,11 +4,11 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULES = ROOT / "py_modules"
+MODULES = ROOT / "backend"
 if str(MODULES) not in sys.path:
     sys.path.insert(0, str(MODULES))
 
-from persist import apply_bindings, load_settings, save_settings
+from sideload.persist import apply_bindings, load_settings, save_settings
 
 
 class PersistTests(unittest.TestCase):
@@ -60,18 +60,27 @@ class PersistTests(unittest.TestCase):
             path = Path(raw) / "settings.json"
             report = {"checkedAt": "2026-10-15T00:00:00+00:00", "items": []}
             for value in (None, 0, 1, "false", {}, []):
-                path.write_text(json.dumps({"checkNotifications": value, "lastCheck": report}))
+                path.write_text(json.dumps({"checkNotifications": value, "showHomeTaskNotice": value, "lastCheck": report}))
                 loaded = load_settings(str(path))
                 self.assertTrue(loaded["checkNotifications"])
+                self.assertTrue(loaded["showHomeTaskNotice"])
                 self.assertNotIn("source", loaded["lastCheck"])
                 self.assertIsNone(loaded["lastScheduledCheck"])
             for field, value in (("source", "other"), ("error", 7), ("checkedAt", "invalid"), ("items", [{}])):
                 path.write_text(json.dumps({"lastScheduledCheck": {**report, field: value}}))
                 self.assertIsNone(load_settings(str(path))["lastScheduledCheck"])
-            path.write_text(json.dumps({"checkNotifications": False, "lastScheduledCheck": {**report, "source": "scheduled", "error": "failed"}}))
+            path.write_text(json.dumps({"checkNotifications": False, "showHomeTaskNotice": False, "lastScheduledCheck": {**report, "source": "scheduled", "error": "failed"}}))
             loaded = load_settings(str(path))
             self.assertFalse(loaded["checkNotifications"])
+            self.assertFalse(loaded["showHomeTaskNotice"])
+            self.assertTrue(loaded["deletePackageAfterInstall"])
             self.assertEqual(loaded["lastScheduledCheck"]["error"], "failed")
+            path.write_text(json.dumps({"deletePackageAfterInstall": True}))
+            self.assertTrue(load_settings(str(path))["deletePackageAfterInstall"])
+            path.write_text(json.dumps({"deletePackageAfterInstall": "yes"}))
+            self.assertTrue(load_settings(str(path))["deletePackageAfterInstall"])
+            path.write_text(json.dumps({"deletePackageAfterInstall": False}))
+            self.assertFalse(load_settings(str(path))["deletePackageAfterInstall"])
 
     def test_settings_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

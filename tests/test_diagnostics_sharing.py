@@ -10,10 +10,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "py_modules"))
-from diagnostics import Diagnostics, PACKAGE_BYTES, ZIP_MARKER
-from diagnostics_sharing import DiagnosticSharing, private_ipv4
-import diagnostics_sharing as module
+sys.path.insert(0, str(ROOT / "backend"))
+from sideload.diagnostics import Diagnostics, PACKAGE_BYTES, ZIP_MARKER
+from sideload.diagnostics_sharing import DiagnosticSharing, private_ipv4
+from sideload import diagnostics_sharing as module
 
 
 class DiagnosticSharingTests(unittest.IsolatedAsyncioTestCase):
@@ -287,14 +287,18 @@ class DiagnosticSharingTests(unittest.IsolatedAsyncioTestCase):
         await self.start()
         old_url = self.share.status()["url"]
         self.share.deadline = time.monotonic() - 1
-        await asyncio.sleep(1.1)
+        await asyncio.wait_for(asyncio.gather(self.share.watch_task, return_exceptions=True), 2)
+        if self.share.drain_task:
+            await asyncio.wait_for(asyncio.shield(self.share.drain_task), 2)
         self.assertEqual(self.share.phase, "expired")
         self.assertNotIn("url", self.share.status())
         self.assertIsNone(self.diag.share_phase)
         self.session = "b" * 32
         await self.start()
         self.addresses.clear()
-        await asyncio.sleep(1.1)
+        await asyncio.wait_for(asyncio.gather(self.share.watch_task, return_exceptions=True), 2)
+        if self.share.drain_task:
+            await asyncio.wait_for(asyncio.shield(self.share.drain_task), 2)
         self.assertEqual(self.share.phase, "error")
         self.assertIsNone(self.share.token)
         self.addresses.append("127.0.0.1")

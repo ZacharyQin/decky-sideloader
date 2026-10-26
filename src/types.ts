@@ -1,9 +1,7 @@
-// Semantic index:
-// - participant: docs/upstream-conflict/sideload/plugin-management.md -- keep management identity separate and mirror task cancellation and notice metadata compatibly.
-// - participant: docs/upstream-conflict/sideload/diagnostics-sharing.md -- define the bounded pickup session DTO without persistent credentials.
-// - participant: docs/upstream-conflict/sideload/diagnostics.md -- define strict bounded observation and export DTOs without exposing configuration.
+import type { LoaderSnapshot } from "./loaderManagement";
+import type { Page } from "./viewState";
 export type OwnershipIntent = { id: string; name: string; folder: string; repo: string; prior_frozen: boolean; action: "takeover" | "return"; state: "prepared" | "writing" | "confirming" | "active" | "released" };
-export type PluginOwnership = { state: "unknown" | "readonly" | "pending" | "store" | "owned" | "nonstore" | "repair"; eligible: boolean; intent: OwnershipIntent | null; error: string | null };
+export type PluginOwnership = { state: "unknown" | "readonly" | "pending" | "store" | "owned" | "nonstore"; eligible: boolean; intent: OwnershipIntent | null; error: string | null };
 export type PluginRow = {
   ownership?: PluginOwnership;
   name: string; folder: string | null; version: string | null; author: string; package_name?: string | null;
@@ -11,47 +9,62 @@ export type PluginRow = {
   memory_in_store?: boolean | null; memory_changed?: boolean;
   registration?: "registered" | "unknown"; cached_in_store?: boolean | null;
   management?: { state: "enabled" | "disabled" | "unregistered" | "ambiguous" | "unknown"; version: string | null; loadType: number | null; versionMismatch: boolean };
-  is_self: boolean; in_store: boolean | null; sideload: boolean;
+  is_self: boolean; in_store: boolean | null; sideload: boolean; skipped_tags?: string[];
 };
 export type CheckStatus = "update" | "current" | "ahead" | "uncomparable" | "unbound" | "no_release" | "no_asset" | "error";
 export type UpdateInfo = {
-  folder?: string; ownership_id?: string | null;
+  folder?: string; ownership_id?: string | null; checkedAt?: string;
   name: string; repo: string | null; current: string | null; latest: string | null;
-  status: CheckStatus; error: string | null;
+  status: CheckStatus; error: string | null; notice?: string | null; release_tag?: string | null;
 };
-export type CheckReport = { checkedAt: string; items: UpdateInfo[]; source?: "manual" | "scheduled"; error?: string };
+export type CheckReport = { checkedAt: string; fullCheckedAt?: string | null; items: UpdateInfo[]; source?: "manual" | "scheduled"; error?: string };
 export type PluginListResponse = {
+  native_snapshot: LoaderSnapshot;
   loader?: { ok: boolean; count: number | null; error: string | null };
   catalog?: { source: "live" | "cache" | "registry" | "unavailable"; timestamp: number | null; stale: boolean; warning: string | null };
   plugins: PluginRow[]; store_ok: boolean; store_error: string | null; last_check: CheckReport | null;
+  release_snapshots?: ReleaseSnapshot[];
 };
 export type RepositoryRow = {
   repo: string; description: string; stars: number; fork: boolean; archived: boolean;
 };
 export type RepositoryPlugin = {
-  path: string; name: string; package_name: string; version: string; evidence: string[];
+  path: string; name: string; package_name: string; version: string; evidence: string[]; requires_root: boolean;
 };
 export type RepositoryProbe = { repo: string; tree_sha: string; plugins: RepositoryPlugin[] };
 export type ZipAsset = { name: string; url: string };
 export type ReleaseRow = {
   tag: string; title: string; repo: string; prerelease: boolean; body: string; published_at: string;
   zips: ZipAsset[]; comparison: -1 | 0 | 1 | null; has_zip: boolean;
+  download_count?: number | null; // Absent in snapshots saved before download statistics were added.
 };
-export type NetworkMode = "direct" | "auto" | "gh-proxy";
-export type NetworkRoute = "direct" | "gh-proxy";
+export type ReleaseSnapshot = {
+  name: string; folder: string | null; repo: string; current: string | null;
+  ownership_id: string | null; checkedAt: string; releases: ReleaseRow[];
+};
+export type ReleaseReadResult = { snapshot: ReleaseSnapshot | null; error: string | null };
+export type NetworkMode = "direct" | "auto" | "gh-proxy" | "ghfast";
+export type NetworkRoute = "direct" | "gh-proxy" | "ghfast";
 export type AppSettings = {
   networkMode?: NetworkMode; lastNetworkRoute?: { route: NetworkRoute; timestamp: number } | null;
   bindings: Record<string, { repo?: string; overridden?: boolean; disabled?: boolean; folder?: string; package_name?: string | null; package_repo?: string | null }>;
-  checkNotifications?: boolean; lastScheduledCheck?: CheckReport | null;
+  checkNotifications?: boolean; showHomeTaskNotice?: boolean; deletePackageAfterInstall?: boolean; downloadTimeoutMinutes?: number; lastScheduledCheck?: CheckReport | null;
   autoCheck: boolean; autoCheckMinutes: number; lastCheck: CheckReport | null;
 };
 export type OperationStage = "checking" | "backup" | "ready" | "uninstalling" | "validating" | "awaiting" | "installing" | "verified" | "failed" | "unknown" | "cancelled" | "closed";
+export type DownloadProgress = { received: number; total: number | null; status: "connecting" | "downloading" | "complete" | "failed"; route: NetworkRoute; attempt: number };
+export type DependencyDownload = DownloadProgress & { name: string; index: number; count: number };
+export type OperationObservation = { id: string; label: string; status: "running" | "complete" | "failed"; detail?: string; updated_at: string };
+export type BackupCleanup = { deleted: number; bytes: number; skipped: number; failed: number };
 export type InstallOperation = {
   id: string; stage: OperationStage; repo: string; tag: string; existing_name: string | null;
   created_at: string; error: string | null; artifact: string; directory: string; request_id: string | null;
   network_mode?: NetworkMode;
-  download?: { received: number; total: number | null; status: "connecting" | "downloading" | "complete" | "failed"; route: NetworkRoute; attempt: number } | null;
-  notice_dismissed?: boolean; cancel_requested?: boolean; uninstall_started?: boolean; uninstall_blocked?: boolean; uninstall_result_received?: boolean;
+  download?: DownloadProgress | null;
+  dependency_download?: DependencyDownload | null;
+  observations?: OperationObservation[];
+  notice_dismissed?: boolean; artifact_deleted?: boolean; cancel_requested?: boolean; uninstall_started?: boolean; uninstall_blocked?: boolean; uninstall_result_received?: boolean;
+  backup_deleted?: boolean;
   saw_finish: boolean; binding_saved: boolean;
   mode?: "install" | "reinstall"; saw_start?: boolean; evidence_conflict?: boolean;
   outcome?: "success" | null; close_reason?: "verified" | "manual"; completed_at?: string;
@@ -73,8 +86,20 @@ export type DiagnosticShare = {
   error?: string;
 };
 
-export type DiagnosticEvent = { event: "loader_read"; ok: boolean; count: number; durationMs: number };
+export type FrontendErrorType = "Error" | "TypeError" | "RangeError" | "ReferenceError" | "SyntaxError" | "URIError" | "EvalError" | "Exception";
+export type DiagnosticEvent =
+  | { event: "loader_read"; ok: boolean; count: number; durationMs: number; clientId?: string }
+  | { event: "frontend_build"; version: string; fingerprint: string; clientId: string }
+  | { event: "ui_page"; page: Page; clientId: string; pluginId?: string; releaseId?: string }
+  | { event: "ui_action"; page: Page; action: string; clientId: string }
+  | { event: "frontend_error"; page: Page; origin: "render" | "action" | "global" | "unhandled" | "toast" | "icon"; errorType: FrontendErrorType; clientId: string; line?: number; column?: number };
 export type DiagnosticStatus =
   | { state: "idle" | "exporting" }
   | { state: "error"; error: string }
   | { state: "success"; file: string; path: string; bytes: number };
+
+export type LicenseEntry = {
+  id: string; name: string; version: string; group: string; host: boolean;
+  license: string; source: string; attribution: string; note?: string;
+  documents: { title: string; text: string }[];
+};
