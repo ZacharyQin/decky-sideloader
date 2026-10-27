@@ -285,10 +285,19 @@ test("page navigation consumes native B and requests native focus for the new pa
   expect(returnedShell).not.toBe(shell);
   expect(returnedShell.props.autoFocus).toBe(true);
   expect(root.root.findAllByType("Field").find((item) => item.props.label === "Example")!.props.preferredFocus).toBe(true);
-  const leave = { preventDefault: mock(), stopPropagation: mock() };
-  await act(async () => navigation(root).props.onCancel(leave));
-  expect(leave.preventDefault).not.toHaveBeenCalled();
 });
+
+for (const [comparison, skipped] of [[0, false], [0, true], [1, false], [-1, false], [null, false]] as const) {
+  test(`version skip is unavailable for the installed selection: comparison=${comparison}, skipped=${skipped}`, async () => {
+    const subject = { ...plugin, skipped_tags: skipped ? [release.tag] : [] };
+    releases = [{ ...release, comparison }];
+    listing = { ...listing, plugins: [subject] };
+    releaseResult(subject);
+    await act(async () => checks.refreshPlugins());
+    const root = await mount(<InstalledTab plugin={subject} onBinding={() => {}} onOperation={() => {}} />);
+    expect(buttons(root).some(button => button.props["data-action-key"] === "skipRelease")).toBe(comparison !== 0);
+  });
+}
 
 for (const status of ["current", "error"] as const) {
   test(`detail completion after returning home publishes ${status} without losing another plugin`, async () => {

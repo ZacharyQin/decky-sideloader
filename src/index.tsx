@@ -29,6 +29,7 @@ import { useLocale } from "./i18n";
 import { presentationStyles } from "./presentation";
 import { startNativeManagement } from "./nativeManagement";
 import { DiagnosticBoundary } from "./DiagnosticBoundary";
+import { returnToPluginList } from "./loaderBridge";
 
 function Content() {
   useLocale();
@@ -108,7 +109,8 @@ function Content() {
   </div> : null;
   return <Focusable key={page === "licenses" ? `${page}:${licenses.entry}:${licenses.document}` : page} className={`decky-sideloader-layout${page === "home" ? " gss-home" : ""}`} autoFocus flow-children="column" navEntryPreferPosition={focusReturn || settingsFocus || networkFocus || diagnosticsFocus || releaseNotesFocus || licensesFocus || page === "licenses" && licenses.focus ? NavEntryPositionPreferences.PREFERRED_CHILD : NavEntryPositionPreferences.FIRST}
     onGamepadFocus={() => { if (focusReturn || settingsFocus || networkFocus || diagnosticsFocus || releaseNotesFocus || licensesFocus) updateViewState((current) => ({ ...current, focusReturn: null, settingsFocus: false, networkFocus: false, diagnosticsFocus: false, releaseNotesFocus: false, licensesFocus: false })); }} onCancel={(event) => {
-    if (page !== "home") { event.preventDefault(); event.stopPropagation(); recordUIAction("back"); back(); }
+    event.preventDefault(); event.stopPropagation(); recordUIAction("back");
+    if (page === "home") returnToPluginList(); else back();
   }} onCancelActionDescription={page === "home" ? t("返回") : backLabel}>
     <style>{presentationStyles}</style>
     <div className="decky-sideloader-body">
@@ -147,8 +149,8 @@ export default definePlugin(() => {
     if (receiveScheduledCheck(event)) toastInfo(checkReportSummary(event.report));
   });
   return {
-    name: "decky-sideloader",
-    titleView: <div className={staticClasses.Title}>decky-sideloader</div>,
+    name: "Sideloader",
+    titleView: <div className={staticClasses.Title}>Sideloader</div>,
     content: <DiagnosticBoundary><Content /></DiagnosticBoundary>,
     icon: <FaGithub />,
     onDismount() { stopNativeManagement(); disposeReleaseReads(); stopOwnershipController(); stopDiagnostics(); stopInstallController(); removeEventListener("scheduled_check_completed", listener); },

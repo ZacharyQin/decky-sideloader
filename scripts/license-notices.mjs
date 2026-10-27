@@ -54,7 +54,7 @@ export default function licenseNotices() {
         roots.set(metadata(directory).name, directory);
       }
       const own = metadata(root);
-      const entries = [{ id: "project", name: "decky-sideloader", version: own.version, group: "project", host: false,
+      const entries = [{ id: "project", name: "Sideloader", version: own.version, group: "project", host: false,
         license: "BSD-3-Clause", source: "https://github.com/SteamDeckHomebrew/decky-plugin-template",
         attribution: "Copyright (c) 2026, zacharym\nOriginal Copyright (c) 2022-2024, Steam Deck Homebrew",
         documents: [document("LICENSE", read(join(root, "LICENSE")))] }];

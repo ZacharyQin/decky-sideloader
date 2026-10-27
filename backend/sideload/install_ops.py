@@ -157,7 +157,7 @@ def inspect_archive(path: Path, existing: dict | None, installed: list[dict], se
         if "root" in (plugin.get("flags") or []):
             warnings.append("此插件声明了 root 权限，请仅安装可信作者的发布。")
         if name == self_name or folder == self_folder:
-            raise RuntimeError("不能通过本插件替换 decky-sideloader 自身")
+            raise RuntimeError("不能通过本插件替换 Sideloader 自身")
         collision = next((p for p in installed if p["name"] == name or p["folder"] == folder), None)
         if existing:
             if name != existing["name"] or folder != existing["folder"]:

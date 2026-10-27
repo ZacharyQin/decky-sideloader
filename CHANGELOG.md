@@ -4,6 +4,24 @@ This file records reviewable source versions. A version commit does not imply a 
 
 本文件记录可审核的源码版本。版本提交不代表发布或已部署，版本号以 `package.json` 为准。每条记录必须英语在前、中文在后；GitHub Release 正文须使用本文件对应版本的完整章节，不以自动生成的提交摘要或整份日志代替。发布须获明确授权。
 
+## [0.3.1] - 2026-10-27
+
+### English
+
+- Separate Return to store and Re-identify plugins into distinct maintenance sections with the existing section spacing.
+- Make B on the QAM home page return to Decky's plugin list. Preserve hierarchical Back/B navigation on inner pages.
+- Show a full-width refresh button with its text when plugin details have no release-update timestamp; keep the compact icon beside an existing timestamp or primary version action.
+- Hide Skip this version and Undo skip when the selected release is already installed, without changing saved skip rules.
+- Display the plugin as Sideloader in Decky, the panel title, notifications and self-protection messages. Keep the repository, package, installation directory and settings/data namespaces named `decky-sideloader`; update API identity, frontend error-source matching and six-language installation instructions for the new display name.
+
+### 中文
+
+- 将“交还商店”和“重新识别插件”拆为独立维护区段，沿用现有区段间距。
+- QAM首页按B返回Decky插件列表；内页仍按原层级返回。
+- 插件详情没有版本更新时间时，刷新按钮整行展示图标与文字；有时间或主要版本操作时保留紧凑图标按钮。
+- 所选版本已安装时隐藏“跳过此版本／取消跳过”，不更改已保存的跳过规则。
+- Decky插件列表、面板标题、通知及自身保护提示显示为Sideloader；仓库、包、安装目录与settings/data命名空间仍为`decky-sideloader`。同步API身份、前端错误来源匹配及六语安装入口说明。
+
 ## [0.3.0] - 2026-10-23
 
 ### English

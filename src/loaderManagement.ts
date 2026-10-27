@@ -38,7 +38,7 @@ export function mergeLoaderPlugins(list: PluginListResponse, snapshot: LoaderSna
   const native = new Map(snapshot.ok ? snapshot.plugins.map((p) => [p.name, p]) : []);
   const plugins: PluginRow[] = list.plugins.map((p) => {
     const entry = native.get(p.name);
-    return { ...p, is_self: p.is_self || p.name === "decky-sideloader", management: {
+    return { ...p, is_self: p.is_self || p.name === "Sideloader" || p.folder === "decky-sideloader", management: {
       state: counts.get(p.name)! > 1 ? "ambiguous" : !snapshot.ok ? "unknown" : !entry ? "unregistered" : entry.disabled ? "disabled" : "enabled",
       version: entry?.version ?? null, loadType: entry?.load_type ?? null,
       versionMismatch: counts.get(p.name) === 1 && !!entry && entry.version !== p.version,
@@ -46,7 +46,7 @@ export function mergeLoaderPlugins(list: PluginListResponse, snapshot: LoaderSna
   });
   for (const p of native.values()) if (!counts.has(p.name)) plugins.push({
     name: p.name, folder: null, version: null, author: "", repo: null, repo_source: null,
-    is_self: p.name === "decky-sideloader", in_store: null, sideload: false,
+    is_self: p.name === "Sideloader", in_store: null, sideload: false,
     management: { state: p.disabled ? "disabled" : "enabled", version: p.version, loadType: p.load_type, versionMismatch: false },
   });
   return { ...list, plugins, loader: snapshot.ok ? { ok: true, count: snapshot.plugins.length, error: null } : { ok: false, count: null, error: snapshot.error } };

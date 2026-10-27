@@ -111,13 +111,13 @@ Decky がまだない場合は、公式の [Decky Loader インストール手�
 3. **General** で **Developer mode** を有効にします。
 4. **Developer** を開き、**Third-Party Plugins** の **Install Plugin from ZIP File** にある **Browse** を選びます。
 5. Decky の確認内容を読み、パッケージ化された ZIP を選びます。
-6. プラグイン一覧に戻り、**decky-sideloader** を開きます。
+6. プラグイン一覧に戻り、**Sideloader** を開きます。
 
-decky-sideloader 自体を更新する場合も、同じ Decky の手順で新しい ZIP をインストールします。削除する場合は、Decky 設定の **Plugins** を使用します。
+Sideloader 自体を更新する場合も、同じ Decky の手順で新しい ZIP をインストールします。削除する場合は、Decky 設定の **Plugins** を使用します。
 
 <h2 id="try-it">使い始める</h2>
 
-QAM で **decky-sideloader** を開き、目的に合う手順を選びます。
+QAM で **Sideloader** を開き、目的に合う手順を選びます。
 
 ### インストール済みプラグインを更新
 

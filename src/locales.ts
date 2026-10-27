@@ -245,7 +245,7 @@ export const messages = {
   "Decky 卸载接口不可用": ["Decky uninstall API unavailable","API de remoção Decky indisponível","API de desinstalación Decky no disponible","Decky の削除 API が利用不可","Decky 제거 API 사용 불가"],
   "安装任务未通过本地预检，拒绝提交": ["Installation rejected: local preflight failed","Instalação recusada: pré-verificação falhou","Instalación rechazada: verificación previa fallida","事前確認に失敗したためインストールを拒否しました","사전 확인 실패로 설치 요청 거부됨"],
   "无法取消此确认请求": ["Cannot cancel this confirmation","Não é possível cancelar esta confirmação","No se puede cancelar esta confirmación","この確認要求はキャンセルできません","이 확인 요청은 취소할 수 없음"],
-  "不能卸载 decky-sideloader 自身": ["decky-sideloader cannot uninstall itself","decky-sideloader não pode remover-se","decky-sideloader no puede desinstalarse a sí mismo","decky-sideloader 自身は削除できません","decky-sideloader 자체는 제거할 수 없음"],
+  "不能卸载 Sideloader 自身": ["Sideloader cannot uninstall itself","Sideloader não pode remover-se","Sideloader no puede desinstalarse a sí mismo","Sideloader 自身は削除できません","Sideloader 자체는 제거할 수 없음"],
   "卸载 {0}": ["Uninstall {0}","Remover {0}","Desinstalar {0}","{0} をアンインストール","{0} 제거"],
   "卸载": ["Uninstall","Remover","Desinstalar","アンインストール","제거"],
   "将移除插件程序。Decky 标准 settings/data 目录保留；插件自定义卸载行为可能影响其他数据。": ["Removes the plugin program. Decky standard settings/data directories are kept; custom uninstall hooks may affect other data.","Remove o programa. Pastas padrão settings/data mantidas; ganchos próprios de remoção podem afetar outros dados.","Elimina el programa. Conserva settings/data estándar; los hooks propios de desinstalación pueden afectar otros datos.","プログラムを削除します。標準の settings/data は保持しますが、独自の削除処理が他のデータに影響する場合があります。","프로그램을 제거합니다. 표준 settings/data는 유지되지만 플러그인 자체 제거 동작이 다른 데이터에 영향을 줄 수 있습니다."],

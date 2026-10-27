@@ -16,10 +16,14 @@ type DeckyBackend = {
 };
 type LoaderWindow = Window & {
   DeckyBackend?: DeckyBackend;
-  DeckyPluginLoader?: { frozenPluginsService?: { update: (names: string[]) => Promise<void>; invalidate: () => Promise<void> }; uninstallPlugin: (name: string, title: string, buttonText: string, description: string) => void };
+  DeckyPluginLoader?: { deckyState: { closeActivePlugin: () => void }; frozenPluginsService?: { update: (names: string[]) => Promise<void>; invalidate: () => Promise<void> }; uninstallPlugin: (name: string, title: string, buttonText: string, description: string) => void };
 };
 const host = () => window as LoaderWindow;
-const SELF_NAME = "decky-sideloader";
+const SELF_NAME = "Sideloader";
+
+export function returnToPluginList(): void {
+  host().DeckyPluginLoader!.deckyState.closeActivePlugin();
+}
 
 export function probeLoaderChannel(): ChannelProbe {
   const backend = host().DeckyBackend;
@@ -92,7 +96,7 @@ export async function cancelPendingInstall(requestId: string): Promise<void> {
 }
 
 export async function uninstallPlugin(name: string, current = () => true): Promise<void> {
-  if (name === SELF_NAME) throw new Error(t("不能卸载 decky-sideloader 自身"));
+  if (name === SELF_NAME) throw new Error(t("不能卸载 Sideloader 自身"));
   const probe = probeLoaderChannel();
   if (!probe.ok) throw new Error(probe.reason);
   const { authorizePluginMutation } = await import("./api");

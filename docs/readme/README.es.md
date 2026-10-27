@@ -111,13 +111,13 @@ Los siguientes nombres corresponden a la interfaz de Decky en inglés:
 3. En **General**, activa **Developer mode**.
 4. Abre **Developer**. En **Third-Party Plugins**, selecciona **Browse** junto a **Install Plugin from ZIP File**.
 5. Lee la confirmación de Decky y selecciona el ZIP preparado.
-6. Vuelve a la lista de plugins y abre **decky-sideloader**.
+6. Vuelve a la lista de plugins y abre **Sideloader**.
 
-Para actualizar el propio decky-sideloader, instala un ZIP más reciente mediante el mismo proceso de Decky. Para eliminarlo, usa **Plugins** en los ajustes de Decky.
+Para actualizar el propio Sideloader, instala un ZIP más reciente mediante el mismo proceso de Decky. Para eliminarlo, usa **Plugins** en los ajustes de Decky.
 
 <h2 id="try-it">Primer uso</h2>
 
-Abre **decky-sideloader** en QAM y elige la ruta que corresponda.
+Abre **Sideloader** en QAM y elige la ruta que corresponda.
 
 ### Actualizar un plugin instalado
 

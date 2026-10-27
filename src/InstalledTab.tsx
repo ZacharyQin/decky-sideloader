@@ -73,11 +73,11 @@ export function InstalledTab({ plugin: selectedPlugin, onBinding, onOperation, o
   };
   const primaryAction = section === "overview" && release?.comparison !== 0 ? action : null;
   const refreshedAt = releaseState.snapshot && <Explanation>{t("版本信息更新于 {0}", [new Date(releaseState.snapshot.checkedAt).toLocaleString()])}</Explanation>;
-  const refreshAction = <Action iconOnly kind="refreshReleases" loading={releaseState.busy} disabled={busy || blocked} onClick={() => void readPluginReleases(plugin, true)}>{t("重新读取版本")}</Action>;
+  const refreshAction = <Action iconOnly={!!refreshedAt} kind="refreshReleases" loading={releaseState.busy} disabled={busy || blocked} onClick={() => void readPluginReleases(plugin, true)}>{t("重新读取版本")}</Action>;
   const skippedNotice = release && (plugin.skipped_tags ?? []).includes(release.tag) && <div className="gss-skipped-notice"><Status tone="warning" title={t("已跳过此版本")}>{t("检查更新会忽略它，直到取消跳过。")}</Status></div>;
   const releaseStatus = <>
     {releaseState.busy && <Status tone="loading" title={t(releaseState.snapshot ? "正在刷新版本…" : "正在读取版本…")} />}
-    {primaryAction ? refreshedAt : <Focusable className="gss-release-actions gss-release-updated" flow-children="row">{refreshedAt}{refreshAction}</Focusable>}
+    {primaryAction ? refreshedAt : refreshedAt ? <Focusable className="gss-release-actions gss-release-updated" flow-children="row">{refreshedAt}{refreshAction}</Focusable> : refreshAction}
     {releaseState.error && <Status tone={releaseState.snapshot ? "warning" : "error"} title={t(releaseState.snapshot ? "刷新失败，保留上次结果" : "读取失败")}>{releaseState.error}</Status>}
     {primaryAction && <Focusable className="gss-release-actions" flow-children="row">
       <div className="gss-release-primary">
@@ -143,6 +143,8 @@ export function InstalledTab({ plugin: selectedPlugin, onBinding, onOperation, o
       <Action kind="returnStore" disabled={blocked || ownership.busy} onClick={() => void ownershipAction("return")}>{t("交还商店")}</Action>
       {ownership.error && <Status tone="error" title={t("交还未确认")}>{ownership.error}</Status>}
     </> : <Action secondary kind="manageBinding" description={plugin.repo ?? t("尚未关联")} onClick={onBinding}>{t("管理仓库关联")}</Action>}
+    </PanelSection>
+    <PanelSection>
     <Action secondary kind="refreshRecognition" description={t("识别结果不对？试试刷新")} disabled={blocked || busy || ownership.busy} onClick={() => void refreshPlugins(true)}>{t("重新识别插件")}</Action>
     </PanelSection>
     <PanelSection title={t("移除插件")}><Action secondary appearance="danger" kind="uninstall" description={t("卸载前仍需在原生窗口确认。")} disabled={!channel.ok || blocked || ownership.busy} onClick={() => { void requestUninstall(plugin.name).catch((err) => setError(errorText(err))); }}>{t("卸载插件")}</Action></PanelSection>
@@ -167,7 +169,7 @@ export function InstalledTab({ plugin: selectedPlugin, onBinding, onOperation, o
       {(plugin.repo && (onVersions || release) || onMaintenance) && <div className="gss-detail-navigation">
         {plugin.repo && onVersions && <Action secondary kind="readReleases" onClick={onVersions}>{t("选择其他版本")}</Action>}
         {onMaintenance && <Action secondary kind="maintenance" onClick={onMaintenance}>{t("维护此插件")}</Action>}
-        {plugin.repo && release && <Action secondary kind="skipRelease" disabled={busy || blocked} onClick={() => void toggleSkip()}>{(plugin.skipped_tags ?? []).includes(release.tag) ? t("取消跳过") : t("跳过此版本")}</Action>}
+        {plugin.repo && release && release.comparison !== 0 && <Action secondary kind="skipRelease" disabled={busy || blocked} onClick={() => void toggleSkip()}>{(plugin.skipped_tags ?? []).includes(release.tag) ? t("取消跳过") : t("跳过此版本")}</Action>}
       </div>}
     </PanelSection>
   </>;

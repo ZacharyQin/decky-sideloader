@@ -111,13 +111,13 @@ Decky가 없다면 공식 [Decky Loader 설치 안내](https://github.com/SteamD
 3. **General**에서 **Developer mode**를 켭니다.
 4. **Developer**를 엽니다. **Third-Party Plugins** 아래 **Install Plugin from ZIP File** 옆의 **Browse**를 선택합니다.
 5. Decky의 확인 내용을 읽고 패키징된 ZIP을 선택합니다.
-6. 플러그인 목록으로 돌아가 **decky-sideloader**를 엽니다.
+6. 플러그인 목록으로 돌아가 **Sideloader**를 엽니다.
 
-decky-sideloader 자체를 업데이트할 때도 같은 Decky 절차로 새 ZIP을 설치합니다. 제거하려면 Decky 설정의 **Plugins**를 사용하세요.
+Sideloader 자체를 업데이트할 때도 같은 Decky 절차로 새 ZIP을 설치합니다. 제거하려면 Decky 설정의 **Plugins**를 사용하세요.
 
 <h2 id="try-it">처음 사용하기</h2>
 
-QAM에서 **decky-sideloader**를 열고 원하는 작업의 절차를 선택하세요.
+QAM에서 **Sideloader**를 열고 원하는 작업의 절차를 선택하세요.
 
 ### 설치된 플러그인 업데이트
 

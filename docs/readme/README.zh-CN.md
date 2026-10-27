@@ -111,13 +111,13 @@ decky-sideloader 是 Steam Deck 的 Decky 插件。它将已安装插件与 GitH
 3. 在 **General** 中开启 **Developer mode**。
 4. 打开 **Developer**，在 **Third-Party Plugins** 下找到 **Install Plugin from ZIP File**，点击旁边的 **Browse**。
 5. 阅读 Decky 的确认内容并选择打包好的 ZIP。
-6. 返回插件列表，打开 **decky-sideloader**。
+6. 返回插件列表，打开 **Sideloader**。
 
-更新 decky-sideloader 本身时，用同样的 Decky 流程安装新版 ZIP。卸载本插件请使用 Decky 设置中的 **Plugins**。
+更新 Sideloader 本身时，用同样的 Decky 流程安装新版 ZIP。卸载本插件请使用 Decky 设置中的 **Plugins**。
 
 <h2 id="try-it">首次使用</h2>
 
-在 QAM 中打开 **decky-sideloader**，按需要选择下面一条路径。
+在 QAM 中打开 **Sideloader**，按需要选择下面一条路径。
 
 ### 更新已有插件
 

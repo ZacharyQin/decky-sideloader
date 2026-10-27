@@ -197,7 +197,7 @@ class PluginLibrary:
         local = read_plugins_dir(os.path.join(decky.DECKY_HOME, "plugins"))
         matches = [p for p in local if p["name"] == name]
         if len(matches) != 1 or name == decky.DECKY_PLUGIN_NAME:
-            raise RuntimeError("插件不存在、名称重复或是 decky-sideloader 自身")
+            raise RuntimeError("插件不存在、名称重复或是 Sideloader 自身")
         return matches[0]
 
     def _require_binding_idle(self, name: str) -> None:

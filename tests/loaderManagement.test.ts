@@ -11,7 +11,7 @@ test("unique Loader match preserves package version, explicit binding and stale 
   expect(result.store_error).toBe("timeout");
 });
 test("disabled, native-only, disk-only and self stay distinct", () => {
-  const result = mergeLoaderPlugins(list(disk({ repo_source: "disabled", repo: null })), { ok: true, plugins: [native("Native", true), native("Other"), native("decky-sideloader")] });
+  const result = mergeLoaderPlugins(list(disk({ repo_source: "disabled", repo: null })), { ok: true, plugins: [native("Native", true), native("Other"), native("Sideloader")] });
   expect(result.plugins[0]).toMatchObject({ repo_source: "disabled", management: { state: "unregistered" } });
   expect(result.plugins[1]).toMatchObject({ folder: null, version: null, in_store: null, repo: null, management: { state: "disabled", version: "2" } });
   expect(pluginReadOnly(result.plugins[1])).toBe(true);

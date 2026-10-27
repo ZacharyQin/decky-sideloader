@@ -146,7 +146,7 @@ test("frontend diagnostics keep page/action/error evidence without messages, URL
     const stop=c.startDiagnostics({status:async()=>({state:'idle'}),record:async(events)=>{sent.push(...events);return {accepted:events.length}},export:async()=>{exported=[...sent];return {state:'idle'}}});
     await c.recordDiagnosticView('details','SYNTHETIC_TOKEN','SYNTHETIC_PRIVATE_RELEASE');
     c.recordUIAction('refreshReleases');
-    const own=new TypeError('Bearer SYNTHETIC_TOKEN');own.stack='TypeError: private\\n at run (https://steamloopback.host/plugins/decky-sideloader/dist/index.js?token=SYNTHETIC_TOKEN:42:7)';
+    const own=new TypeError('Bearer SYNTHETIC_TOKEN');own.stack='TypeError: private\\n at run (https://steamloopback.host/plugins/Sideloader/dist/index.js?token=SYNTHETIC_TOKEN:42:7)';
     const other=new Error('SYNTHETIC_TOKEN');other.stack='Error: private\\n at run (https://steamloopback.host/plugins/another/dist/index.js:5:2)';
     for(const error of [own,other]){const event=new Event('error');Object.defineProperty(event,'error',{value:error});window.dispatchEvent(event)}
     await c.requestDiagnosticsExport();

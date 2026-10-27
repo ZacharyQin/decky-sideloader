@@ -55,7 +55,7 @@ export function frontendLocation(error: unknown): { line: number; column: number
     if (!match) continue;
     try {
       const path = decodeURIComponent(new URL(match[1]).pathname);
-      if (!/\/plugins\/decky-sideloader\/(?:dist\/)?index\.js$/.test(path)) continue;
+      if (!/\/plugins\/Sideloader\/(?:dist\/)?index\.js$/.test(path)) continue;
       const location = { line: Number(match[2]), column: Number(match[3]) };
       if (validField("line", location.line) && validField("column", location.column)) return location;
     } catch { /* A malformed or unrelated URL is not a plugin stack frame. */ }
