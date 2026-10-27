@@ -6,16 +6,22 @@ import os
 from pathlib import Path
 import stat
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from sideload.repository_map import read_mapping
 
 
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
+    read_mapping(root / "data" / "repositories.json")
     version = json.loads((root / "package.json").read_text())["version"]
     ref = os.environ.get("GITHUB_REF", "")
     if ref.startswith("refs/tags/") and ref != f"refs/tags/v{version}":
         raise SystemExit(f"{ref} does not match package.json version v{version}")
     members = {name: root / name for name in (
         "plugin.json", "package.json", "LICENSE", "README.md", "CHANGELOG.md",
+        "data/repositories.json",
         "dist/index.js", "dist/index.js.map", "dist/notices.json", "dist/build.json",
         "docs/readme/README.zh-CN.md", "docs/readme/README.pt.md",
         "docs/readme/README.es.md", "docs/readme/README.ja.md", "docs/readme/README.ko.md",

@@ -80,7 +80,6 @@ export function OperationPanel() {
       <Status title={t("备份限制")}>{op.backup.scope}</Status>
       {op.backup_deleted ? <Status title={t("数据备份已删除")} /> : <Status title={t("备份位置")}><span style={{ overflowWrap: "anywhere" }}>{op.backup.archive}</span></Status>}
     </Disclosure>}
-    {op.package?.warnings?.map((warning) => <Status tone="warning" key={warning} title={t("安装前请核对")}>{warning}</Status>)}
     {op.stage === "ready" && <Action kind="confirmInstall" disabled={isDispatchBlocked(op.id) || !!op.cancel_requested} onClick={() => void dispatchPrepared(undefined, op.id)}>{op.mode === "reinstall" ? t("继续到卸载确认") : t("继续到 Decky 安装确认")}</Action>}
     {op.stage === "ready" && isDispatchBlocked(op.id) && !op.cancel_requested && !cancelling && <Status title={t("已停止自动提交，可重试取消或重新核对结果")} />}
     {op.stage === "awaiting" && <Status title={t("请在 Decky 原生窗口确认")}>{t("请求已提交，尚无安装完成证据。关闭本面板不会取消安装。")}</Status>}

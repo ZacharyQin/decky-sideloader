@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 8
@@ -33,6 +35,10 @@ jobs:
         with:
           bun-version: "1.4.2"
       - run: pnpm install --frozen-lockfile
+      - name: Validate repository map
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python3 -B scripts/check-repository-map.py --base-ref "$BASE_REF"
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:python

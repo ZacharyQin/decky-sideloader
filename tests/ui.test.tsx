@@ -65,6 +65,8 @@ const api = {
   listSideloadPlugins: mock(async (_refresh?: boolean) => listing), listReleases: mock(async () => releases), checkUpdates: mock(async () => listing),
   getPluginReleases: mock(async (_repo: string, _current: string | null, name: string) => releaseResult(listing.plugins.find(p => p.name === name) ?? plugin)),
   getAppSettings: mock(async () => settings), setCheckNotifications: mock(async () => settings), setShowHomeTaskNotice: mock(async (enabled: boolean) => (settings = { ...settings, showHomeTaskNotice: enabled })), setDeletePackageAfterInstall: mock(async (enabled: boolean) => (settings = { ...settings, deletePackageAfterInstall: enabled })), setDownloadTimeout: mock(async (minutes: number) => (settings = { ...settings, downloadTimeoutMinutes: minutes })), setSkippedRelease: mock(async () => listing), setAutoCheck: mock(async () => settings), setNetworkMode: mock(async () => settings),
+  getRepositoryMapStatus: mock(async () => ({ revision: 1, updated_at: "2026-10-27", count: 35, source: "bundled" as const, warning: null })),
+  updateRepositoryMap: mock(async () => ({ revision: 2, updated_at: "2026-10-28", count: 36, source: "downloaded" as const, warning: null, changed: true })),
   getOpenSourceNotices: mock(async () => ({ entries: [{ id: "sample", name: "Sample", version: "1.0", group: "transitive", host: false,
     license: "MIT", source: "https://example.com", attribution: "Example", documents: [{ title: "LICENSE", text: "Copyright Example\n\nPermission granted.\n" }] }] })),
   setBinding: mock(async () => ({ name: "Example", repo: "acme/example" })), clearBinding: mock(async () => undefined),
@@ -137,6 +139,8 @@ beforeEach(async () => {
   api.setCheckNotifications.mockReset().mockImplementation(async () => settings);
   api.setShowHomeTaskNotice.mockReset().mockImplementation(async (enabled: boolean) => (settings = { ...settings, showHomeTaskNotice: enabled }));
   api.deleteBackups.mockReset().mockImplementation(async () => ({ deleted: 0, bytes: 0, skipped: 0, failed: 0 }));
+  api.getRepositoryMapStatus.mockReset().mockImplementation(async () => ({ revision: 1, updated_at: "2026-10-27", count: 35, source: "bundled", warning: null }));
+  api.updateRepositoryMap.mockReset().mockImplementation(async () => ({ revision: 2, updated_at: "2026-10-28", count: 36, source: "downloaded", warning: null, changed: true }));
   listing = { native_snapshot: { ok: true, plugins: [] }, plugins: [plugin], store_ok: true, store_error: null, last_check: null };
   releases = [release]; repositories = [repository]; operation = null;
   probe = { repo: "acme/example", tree_sha: "a".repeat(40), plugins: [{ path: "", name: "Example", package_name: "example", version: "1.0.0", evidence: ["依赖 @decky/api"], requires_root: false }] };
@@ -939,14 +943,54 @@ test("reloaded ready operation requires a user action", async () => {
   expect(loaderCall).not.toHaveBeenCalled();
 });
 
-test("package warnings require explicit continuation", async () => {
+test("package warnings open a confirmation before submitting and preserve the selected install type", async () => {
   stop = controller.startInstallController();
   await controller.refreshOperation();
   operation = makeOperation();
-  await controller.startInstallation(release, release.zips[0].url, null);
-  operation = { ...operation, stage: "ready", package: { ...operation.package!, warnings: ["requires root"] } };
-  await controller.refreshOperation();
+  await controller.startInstallation(release, release.zips[0].url, plugin);
+  operation = { ...operation, stage: "ready", package: { ...operation.package!, warnings: ["此插件声明了 root 权限，请仅安装可信作者的发布。", "安装包未附带 LICENSE，请自行核对作者的分发许可。"] } };
+  await act(async () => { await controller.refreshOperation(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
+  expect(nativeModal!.props.strDescription).toContain("root 权限");
+  expect(nativeModal!.props.strDescription).toContain("LICENSE");
+  expect(api.submitPrepared).not.toHaveBeenCalled();
   expect(loaderCall).not.toHaveBeenCalled();
+  await act(async () => { nativeModal!.props.onOK(); for (let i = 0; i < 20; i++) await Promise.resolve(); });
+  expect(api.submitPrepared).toHaveBeenCalledTimes(1);
+  expect(loaderCall).toHaveBeenCalledWith("utilities/install_plugin", operation!.artifact, "Example", "2.0.0", "a".repeat(64), 2);
+});
+
+test("dismissing package warning leaves the task ready and allows an explicit retry", async () => {
+  stop = controller.startInstallController(); await controller.refreshOperation();
+  operation = makeOperation(); await controller.startInstallation(release, release.zips[0].url, null);
+  operation = { ...operation, stage: "ready", package: { ...operation.package!, warnings: ["requires root"] } };
+  await act(async () => { await controller.refreshOperation(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
+  await act(async () => { nativeModal!.props.onCancel(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
+  expect(api.submitPrepared).not.toHaveBeenCalled();
+  expect(loaderCall).not.toHaveBeenCalled();
+  await controller.refreshOperation();
+  const root = await mount(<OperationPanel />);
+  const retry = buttons(root).find(button => button.props["data-action-key"] === "confirmInstall")!;
+  await act(async () => { retry.props.onClick(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
+  expect(nativeModal!.props.strDescription).toContain("requires root");
+  await act(async () => { nativeModal!.props.onOK(); for (let i = 0; i < 20; i++) await Promise.resolve(); });
+  expect(api.submitPrepared).toHaveBeenCalledTimes(1);
+  expect(loaderCall).toHaveBeenCalledTimes(1);
+});
+
+test("late package warning approval after cancellation or controller restart cannot install", async () => {
+  for (const action of ["cancel", "restart"] as const) {
+    stop = controller.startInstallController(); await controller.refreshOperation();
+    operation = makeOperation(); await controller.startInstallation(release, release.zips[0].url, null);
+    operation = { ...operation, stage: "ready", package: { ...operation.package!, warnings: ["requires root"] } };
+    await act(async () => { await controller.refreshOperation(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
+    const approve = nativeModal!.props.onOK;
+    if (action === "cancel") await controller.cancelCurrentOperation();
+    else { stop(); stop = controller.startInstallController(); await controller.refreshOperation(); }
+    await act(async () => { approve(); for (let i = 0; i < 20; i++) await Promise.resolve(); });
+    expect(api.submitPrepared).not.toHaveBeenCalled();
+    expect(loaderCall).not.toHaveBeenCalled();
+    stop(); stop = null; operation = null;
+  }
 });
 
 test("one check survives QAM remount and prevents reentry", async () => {
@@ -3135,4 +3179,49 @@ test("cleanup refresh removes the deleted backup location without discarding tas
   function InstallationConsumer() { outcome = controller.useInstallation().operation?.outcome; return null; }
   await mount(<InstallationConsumer />);
   expect(outcome).toBe("success");
+});
+
+test("repository map completion wins over an older status read", async () => {
+  const { RepositoryMapSettings } = await import("../src/RepositoryMapSettings");
+  const { Status } = await import("../src/components");
+  let finishRead!: (value: Awaited<ReturnType<typeof api.getRepositoryMapStatus>>) => void;
+  api.getRepositoryMapStatus.mockImplementationOnce(() => new Promise(resolve => { finishRead = resolve; }));
+  const root = await mount(<RepositoryMapSettings />);
+  await act(async () => { buttons(root).find(button => button.props["data-action-key"] === "updateRepositoryMap")!.props.onClick(); });
+  await act(async () => { finishRead({ revision: 1, updated_at: "2026-10-27", count: 35, source: "bundled", warning: null }); });
+  const titles = root.root.findAllByType(Status).map(node => String(node.props.title));
+  expect(titles.some(title => title.includes("2") && title.includes("36"))).toBe(true);
+  expect(titles.some(title => title.includes("1") && title.includes("35"))).toBe(false);
+});
+
+test("repository map failure retains current metadata and allows retry", async () => {
+  const { RepositoryMapSettings } = await import("../src/RepositoryMapSettings");
+  const { Status } = await import("../src/components");
+  api.updateRepositoryMap.mockRejectedValueOnce(new Error("network offline"));
+  const root = await mount(<RepositoryMapSettings />);
+  const action = () => buttons(root).find(button => button.props["data-action-key"] === "updateRepositoryMap")!;
+  await act(async () => { action().props.onClick(); });
+  expect(root.root.findAllByType(Status).some(node => node.props.tone === "error" && node.props.children === "network offline")).toBe(true);
+  expect(root.root.findAllByType(Status).some(node => String(node.props.title).includes("35"))).toBe(true);
+  expect(action().props.disabled).toBe(false);
+  await act(async () => { action().props.onClick(); });
+  expect(root.root.findAllByType(Status).some(node => node.props.tone === "error")).toBe(false);
+  expect(root.root.findAllByType(Status).some(node => String(node.props.title).includes("36"))).toBe(true);
+});
+
+test("repository map update remains in flight across a QAM remount", async () => {
+  const { RepositoryMapSettings } = await import("../src/RepositoryMapSettings");
+  const { Status } = await import("../src/components");
+  let finish!: (value: Awaited<ReturnType<typeof api.updateRepositoryMap>>) => void;
+  api.updateRepositoryMap.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const root = await mount(<RepositoryMapSettings />);
+  await act(async () => { buttons(root).find(button => button.props["data-action-key"] === "updateRepositoryMap")!.props.onClick(); });
+  await unmount(root);
+  const reopened = await mount(<RepositoryMapSettings />);
+  const action = () => buttons(reopened).find(button => button.props["data-action-key"] === "updateRepositoryMap")!;
+  expect(action().props["aria-busy"]).toBe(true);
+  await act(async () => { finish({ revision: 2, updated_at: "2026-10-28", count: 36, source: "downloaded", warning: null, changed: true }); });
+  expect(action().props["aria-busy"]).toBe(false);
+  expect(api.updateRepositoryMap).toHaveBeenCalledTimes(1);
+  expect(reopened.root.findAllByType(Status).some(node => String(node.props.title).includes("36"))).toBe(true);
 });

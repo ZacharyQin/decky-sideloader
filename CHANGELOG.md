@@ -4,6 +4,20 @@ This file records reviewable source versions. A version commit does not imply a 
 
 本文件记录可审核的源码版本。版本提交不代表发布或已部署，版本号以 `package.json` 为准。每条记录必须英语在前、中文在后；GitHub Release 正文须使用本文件对应版本的完整章节，不以自动生成的提交摘要或整份日志代替。发布须获明确授权。
 
+## [0.4.0] - 2026-10-27
+
+### English
+
+- Show package warnings in a native confirmation dialog as soon as preparation completes. Continuing opens Decky's installation confirmation; cancellation keeps the prepared task available for an explicit retry. Preserve uninstall-and-reinstall confirmation and do not replay a pending dialog after reload.
+- Bundle a maintained, independently versioned `plugin.json.name` to GitHub repository map for offline first-use recognition. Preserve explicit bindings, completed-install links, takeover repositories, stopped tracking and identity/ownership guards; fall back to package metadata when an entry is absent.
+- Add a six-language Repository map section in Settings with revision/count/date and a separate update action using the selected network mode. Validate and atomically replace complete snapshots, retain the last good version on failure, prevent downgrades and changes during installation/release checks, and drain updates on reload. Validate maintained data and revision changes in CI and include the source-commit snapshot in runtime ZIPs.
+
+### 中文
+
+- 安装包准备完成后，以原生确认弹窗展示安装警告；继续后进入 Decky 安装确认，取消则保留已准备任务供用户主动重试。保留卸载并安装的独立确认，重载后不自动重弹。
+- 随包附带独立版本的 `plugin.json.name` → GitHub 仓库映射表，首次使用离线识别；保留手动关联、成功安装确认的关联、接管仓库、停止追踪选择及身份／归属保护，未收录条目继续使用包元数据等现有来源。
+- 设置新增六语“仓库映射表”区段，展示修订号、条目数、日期并单独更新，复用所选网络模式；完整校验后原子替换整表，失败保留旧版、防止降级，安装／版本检查期间不切换，重载时排空更新任务。CI 校验数据与修订号变更，运行 ZIP 附带源提交中的映射快照。
+
 ## [0.3.1] - 2026-10-27
 
 ### English

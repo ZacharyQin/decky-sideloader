@@ -2,7 +2,7 @@ import { t } from "./i18n";
 import { mergeLoaderPlugins } from "./loaderManagement";
 import { callable } from "@decky/api";
 import type { AppSettings, InstallOperation, PluginListResponse, ReleaseRow, ReleaseReadResult, RepositoryRow, RepositoryProbe, NetworkMode, DiagnosticEvent, DiagnosticStatus, DiagnosticShare, OwnershipIntent } from "./types";
-import type { BackupCleanup, LicenseEntry } from "./types";
+import type { BackupCleanup, LicenseEntry, RepositoryMapStatus, RepositoryMapUpdate } from "./types";
 import { cleanDiagnosticEvent } from "./diagnosticEvents";
 
 const readDiskPlugins = callable<[refresh?: boolean], PluginListResponse>("list_sideload_plugins");
@@ -13,6 +13,8 @@ async function withLoader(read: () => Promise<PluginListResponse>): Promise<Plug
 }
 export const listSideloadPlugins = (refresh = false) => withLoader(() => refresh ? readDiskPlugins(true) : readDiskPlugins());
 export const getAppSettings = callable<[], AppSettings>("get_app_settings");
+export const getRepositoryMapStatus = callable<[], RepositoryMapStatus>("get_repository_map_status");
+export const updateRepositoryMap = callable<[], RepositoryMapUpdate>("update_repository_map");
 export const getOpenSourceNotices = callable<[], { entries: LicenseEntry[] }>("get_open_source_notices");
 export const setNetworkMode = callable<[mode: NetworkMode], AppSettings>("set_network_mode");
 export const setCheckNotifications = callable<[enabled: boolean], AppSettings>("set_check_notifications");

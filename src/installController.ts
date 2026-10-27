@@ -2,7 +2,7 @@ import { t } from "./i18n";
 import { useSyncExternalStore } from "react";
 import { claimUninstall, completeUninstall, cancelOperation, continuePrepared, dismissOperation, closeOperation, deleteInstallPackage, getOperation, prepareInstall, recordInstallEvent, retryDownload, submitPrepared } from "./api";
 import { errorText } from "./errors";
-import { cancelPendingInstall, confirmPrepareReinstall, confirmReinstall, uninstallForReinstall, InstallType, installFromArtifact, listenForInstallEvents, probeLoaderChannel, uninstallPlugin } from "./loaderBridge";
+import { cancelPendingInstall, confirmInstallWarnings, confirmPrepareReinstall, confirmReinstall, uninstallForReinstall, InstallType, installFromArtifact, listenForInstallEvents, probeLoaderChannel, uninstallPlugin } from "./loaderBridge";
 import type { InstallOperation, PluginRow, ReleaseRow } from "./types";
 import { versionAction } from "./viewModel";
 import { refreshAfterPluginMutation } from "./checkController";
@@ -58,8 +58,8 @@ export async function refreshOperation(): Promise<void> {
       initializeEvents = null;
       initialize?.(op);
       if (op?.stage === "ready" && !op.cancel_requested && !blocked.has(op.id) && automatic?.id === op.id) {
-        if (op.package?.warnings?.length) automatic = null;
-        else await dispatchPrepared(automatic.type);
+        if (op.package?.warnings?.length) void dispatchPrepared(automatic.type, op.id);
+        else await dispatchPrepared(automatic.type, op.id);
       }
     } catch (error) { if (currentGeneration === generation) publish(snapshot.operation, errorText(error)); }
   })();
@@ -82,6 +82,7 @@ export async function dispatchPrepared(type?: InstallType, identifier = snapshot
     if (currentGeneration === generation && snapshot.operation?.id === op.id && result?.id === op.id) publish(result, error);
   };
   try {
+    if (op.package?.warnings?.length && (!await confirmInstallWarnings(op.package.warnings) || stopped() || snapshot.operation?.stage !== "ready")) return;
     if (op.mode === "reinstall") {
       const confirmed = await confirmReinstall(op);
       if (stopped()) return;

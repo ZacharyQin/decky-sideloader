@@ -143,6 +143,14 @@ export function confirmNetworkMode(): Promise<boolean> {
     strDescription: t("GH-Proxy：https://gh-proxy.org/；GHFast：https://ghfast.top/。第三方可见查询与下载内容，也可修改返回内容。TLS 和 ZIP 校验不保证作者或代码可信。不改变系统代理，进行中的任务保留开始时的模式。"),
   }), true);
 }
+export function confirmInstallWarnings(warnings: string[]): Promise<boolean> {
+  return nativeConfirmation(() => ({ strTitle: t("安装前请核对"),
+    strDescription: warnings.map(warning => warning === "安装包未附带 LICENSE，请自行核对作者的分发许可。" ? t("安装包未附带 LICENSE，请自行核对作者的分发许可。")
+      : warning === "此插件声明了 root 权限，请仅安装可信作者的发布。" ? t("此插件声明了 root 权限，请仅安装可信作者的发布。") : warning).join("\n\n"),
+    strOKButtonText: t("继续安装"),
+  }));
+}
+
 
 export function confirmPrepareReinstall(name: string): Promise<boolean> {
   return nativeConfirmation(() => ({ strTitle: t("卸载并安装 {0}", [name]),

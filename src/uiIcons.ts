@@ -20,6 +20,7 @@ export const icons = {
   cancelRequest: FaTimesCircle, finishTracking: FaArchive, skipRelease: FaTimesCircle, continueInstall: FaShieldAlt, retryDownload: FaSyncAlt,
   maintenance: FaTools, network: FaGlobe,
   deleteBackups: FaTrashAlt,
+  updateRepositoryMap: FaSyncAlt,
 } satisfies Record<string, IconType>;
 export type IconKey = keyof typeof icons;
 

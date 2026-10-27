@@ -5,7 +5,7 @@ export type PluginOwnership = { state: "unknown" | "readonly" | "pending" | "sto
 export type PluginRow = {
   ownership?: PluginOwnership;
   name: string; folder: string | null; version: string | null; author: string; package_name?: string | null;
-  repo: string | null; repo_source: "user" | "package.json" | "remembered" | "disabled" | null;
+  repo: string | null; repo_source: "user" | "package.json" | "remembered" | "mapping" | "disabled" | null;
   memory_in_store?: boolean | null; memory_changed?: boolean;
   registration?: "registered" | "unknown"; cached_in_store?: boolean | null;
   management?: { state: "enabled" | "disabled" | "unregistered" | "ambiguous" | "unknown"; version: string | null; loadType: number | null; versionMismatch: boolean };
@@ -32,6 +32,10 @@ export type RepositoryPlugin = {
   path: string; name: string; package_name: string; version: string; evidence: string[]; requires_root: boolean;
 };
 export type RepositoryProbe = { repo: string; tree_sha: string; plugins: RepositoryPlugin[] };
+export type RepositoryMapStatus = {
+  revision: number; updated_at: string; count: number; source: "bundled" | "downloaded"; warning: string | null;
+};
+export type RepositoryMapUpdate = RepositoryMapStatus & { changed: boolean };
 export type ZipAsset = { name: string; url: string };
 export type ReleaseRow = {
   tag: string; title: string; repo: string; prerelease: boolean; body: string; published_at: string;

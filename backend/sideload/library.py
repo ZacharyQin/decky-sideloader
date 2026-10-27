@@ -13,6 +13,7 @@ from sideload.rpc import _observed_rpc
 from sideload.diagnostic_context import DiagnosticError, identifier as diagnostic_id
 from sideload.diagnostic_snapshot import library_snapshot
 from sideload.scan import classify_plugins, read_plugins_dir
+from sideload.repository_map import resolve_repository
 
 
 class PluginLibrary:
@@ -86,6 +87,7 @@ class PluginLibrary:
         store_error = catalog["warning"]
         settings = load_settings(_settings_path())
         plugins = apply_bindings(classify_plugins(local, store_names, decky.DECKY_PLUGIN_NAME, store_ok=store_ok), settings.get("bindings", {}))
+        repositories = self._repository_map_service().value["repositories"]
         for plugin in plugins:
             plugin["loader_managed"] = None if native_names is None else False if plugin["name"] not in native_names else None if capable_names is None else plugin["name"] in capable_names
             memory = memories[plugin["folder"]]
@@ -94,9 +96,7 @@ class PluginLibrary:
             plugin["memory_in_store"] = memory.get("in_store")
             plugin["memory_changed"] = bool(plugin.get("binding_changed") or memory.get("changed", False) and not plugin.get("binding_confirmed"))
             plugin["memory_error"] = memory_error
-            if plugin["repo_source"] is None and memory.get("repo"):
-                plugin["repo"], plugin["repo_source"] = memory["repo"], "remembered"
-            plugin["skipped_tags"] = skipped_tags(settings, plugin["name"], plugin.get("repo"))
+            plugin["repo"], plugin["repo_source"] = resolve_repository(plugin, memory, repositories)
         ownership = self._ownership()
         try:
             ledger, ownership_error = ownership.load(), None
@@ -107,6 +107,8 @@ class PluginLibrary:
         except RuntimeError:
             frozen = None
         plugins = ownership.resolve(plugins, frozen, ledger, ownership_error)
+        for plugin in plugins:
+            plugin["skipped_tags"] = skipped_tags(settings, plugin["name"], plugin.get("repo"))
         self._store_names, self._store_ok = {p["name"] for p in plugins if p["loader_managed"] is True}, native["ok"]
         self._diagnostic_library = library_snapshot(plugins, native, catalog, frozen)
         self._diagnostic("list_summary", source=catalog["source"], count=len(plugins), ok=native["ok"] and not bool(catalog["warning"]), loaderOk=native["ok"], catalogOk=not bool(catalog["warning"]))

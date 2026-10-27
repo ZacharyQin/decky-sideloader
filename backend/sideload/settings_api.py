@@ -1,9 +1,12 @@
 import asyncio
+from pathlib import Path
+import decky
 from sideload import http_client
 from sideload.github_transport import MODES
 from sideload.paths import _settings_path
 from sideload.persist import load_settings, save_settings
 from sideload.rpc import _observed_rpc
+from sideload.repository_map import BUNDLED_MAP, MAP_URL, MAX_MAP_BYTES, RepositoryMap
 
 
 class SettingsAPI:
@@ -16,6 +19,51 @@ class SettingsAPI:
     def _query_fetch(self):
         transport = self._transport()
         return lambda url, **kwargs: http_client._fetch_json(url, transport=transport, **kwargs)
+
+    def _repository_map_service(self):
+        if not hasattr(self, "_repository_map"):
+            self._repository_map = RepositoryMap(BUNDLED_MAP, Path(decky.DECKY_PLUGIN_RUNTIME_DIR) / "repository-map.json")
+        return self._repository_map
+
+    @_observed_rpc
+    async def get_repository_map_status(self) -> dict:
+        return self._repository_map_service().status()
+
+    def _require_repository_map_idle(self):
+        self._require_binding_idle(decky.DECKY_PLUGIN_NAME)
+        operation = getattr(getattr(self, "_flow", None), "operation", None)
+        if operation and operation["stage"] not in ("failed", "closed", "cancelled"):
+            raise RuntimeError("任务进行中，请结束后更新仓库映射表")
+        if getattr(self, "_check_lock", None) and self._check_lock.locked():
+            raise RuntimeError("正在检查版本，请稍后更新仓库映射表")
+
+    @_observed_rpc
+    async def update_repository_map(self) -> dict:
+        task = getattr(self, "_repository_map_update", None)
+        if task is None:
+            self._require_repository_map_idle()
+            task = asyncio.create_task(self._update_repository_map())
+            self._repository_map_update = task
+            def finished(done):
+                if self._repository_map_update is done:
+                    self._repository_map_update = None
+                if not done.cancelled():
+                    done.exception()
+            task.add_done_callback(finished)
+        return await asyncio.shield(task)
+
+    async def _update_repository_map(self) -> dict:
+        service = self._repository_map_service()
+        transport = self._transport()
+        payload = await asyncio.to_thread(transport.fetch_bytes, MAP_URL, accept="application/json", max_bytes=MAX_MAP_BYTES)
+        async with self._ownership_lock():
+            self._require_repository_map_idle()
+            if not hasattr(self, "_check_lock"):
+                self._check_lock = asyncio.Lock()
+            async with self._check_lock:
+                changed = await asyncio.to_thread(service.install, payload)
+                return {**service.status(), "changed": changed}
+
 
     @_observed_rpc
     async def get_app_settings(self) -> dict:

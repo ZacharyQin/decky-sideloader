@@ -12,6 +12,7 @@ import { LanguagePicker } from "./LanguagePicker";
 import { confirmDeleteBackups } from "./loaderBridge";
 import { refreshOperation } from "./installController";
 import type { AppSettings, BackupCleanup, CheckReport } from "./types";
+import { RepositoryMapSettings } from "./RepositoryMapSettings";
 
 let showHomeTaskNotice = false;
 let showHomeTaskNoticeRevision = 0;
@@ -135,7 +136,9 @@ export function SettingsTab({ onResults = () => {}, focusResults = false, report
     {cleanup && <Status tone={cleanup.failed ? "warning" : "success"} title={t("已删除 {0} 份备份，释放 {1} MiB", [cleanup.deleted, (cleanup.bytes / 1024 / 1024).toFixed(1)])}>
       {t("跳过 {0} 项，删除失败 {1} 项", [cleanup.skipped, cleanup.failed])}
     </Status>}
-    </PanelSection><PanelSection title={t("连接与管理")}>
+    </PanelSection>
+    <RepositoryMapSettings disabled={busy} />
+    <PanelSection title={t("连接与管理")}>
     <PanelSectionRow><Field className="gss-row gss-action-row" bottomSeparator="none" data-action-key="checkResults" label={t("最近定时检查")}
       description={scheduled ? `${shortCheckTime(scheduled.checkedAt)}，${compactCheckSummary(scheduled)}` : t("尚未定时检查")}
       icon={<FaClock aria-hidden focusable="false" />} childrenContainerWidth="min" inlineWrap="keep-inline"

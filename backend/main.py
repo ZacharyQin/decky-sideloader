@@ -31,6 +31,9 @@ class Plugin(DiagnosticsAPI, SettingsAPI, PluginLibrary, ReleasesAPI, Installati
         worker = getattr(self, "_catalog_worker", None)
         if worker is not None:
             await asyncio.shield(worker)
+        mapping_update = getattr(self, "_repository_map_update", None)
+        if mapping_update is not None:
+            await asyncio.gather(asyncio.shield(mapping_update), return_exceptions=True)
         reads = list(getattr(self, "_release_reads", {}).values())
         if reads:
             await asyncio.gather(*(asyncio.shield(task) for task in reads), return_exceptions=True)

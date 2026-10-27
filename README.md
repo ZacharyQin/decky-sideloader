@@ -121,7 +121,7 @@ Open **Sideloader** in QAM, then choose the path that matches what you want to d
 
 ### Update an installed plugin
 
-1. Open the plugin from Home. If its repository is missing, use **Manage repository link**, search or paste an address, and select **Save link**.
+1. Open the plugin from Home. Supported names are linked automatically using the bundled repository map. If the link is missing or wrong, use **Manage repository link**, search or paste an address, and select **Save link**.
 2. Select **Check for updates** on Home, or **Reload releases** in the plugin's details.
 3. Read the release notes, select the version you want and start its installation.
 
@@ -133,7 +133,7 @@ Open **Sideloader** in QAM, then choose the path that matches what you want to d
 
 ### Confirm and follow the installation
 
-Follow the prompts to start preparation. When preparation finishes, confirm installation in Decky's native window. The task page shows progress and the result; after completion, return to the plugin list.
+Follow the prompts to start preparation. If the package has installation warnings, review the confirmation dialog before continuing; then confirm installation in Decky's native window. The task page shows progress and the result; after completion, return to the plugin list.
 
 Use **A** to activate an item and **B** to return. Search drafts, version choices and task state survive closing and reopening QAM.
 
@@ -188,6 +188,12 @@ Details keep the last successfully loaded release list until you reload it or ch
 Open **Plugin maintenance** in a plugin's details to reinstall the same version, uninstall and reinstall, change its repository link, or remove it. Routine updates use the version actions in details.
 
 To use a GitHub release for a store-managed plugin, open **Settings → Store plugins** and explicitly take over the plugin. This pauses its native store update checks. **Return to store** restores its previous store-update setting.
+
+### Repository map
+
+Open **Settings → Repository map → Update repository map** to download the latest map without updating Sideloader itself. Opening the plugin uses local data without downloading a map. The newer valid bundled or downloaded snapshot is used; failed updates retain the current map. Manual links, repositories confirmed by completed installations or store takeover, and stopped tracking are preserved. Finish active installation tasks and release checks before updating the map.
+
+The maintained source is [`data/repositories.json`](./data/repositories.json). Keys must exactly match each upstream `plugin.json.name`, including projects inside a monorepo; values are GitHub `owner/repo` identifiers. Verify the manifest before adding an entry, increment `revision` and update `updated_at` for every data change, then run `python3 -B scripts/check-repository-map.py`. CI also compares revisions with the base commit. Packages include the reviewed snapshot from their source commit; builds do not fetch newer data. A mapping does not take over a store-managed plugin.
 
 <details>
 <summary>Connection settings</summary>

@@ -121,7 +121,7 @@ Abre **Sideloader** en QAM y elige la ruta que corresponda.
 
 ### Actualizar un plugin instalado
 
-1. Abre el plugin desde Inicio. Si falta el repositorio, usa **Gestionar enlace**, busca o pega una dirección y selecciona **Guardar vínculo**.
+1. Abre el plugin desde Inicio. Los nombres incluidos en el mapa de repositorios se vinculan automáticamente. Si el enlace falta o es incorrecto, usa **Gestionar enlace**, busca o pega una dirección y selecciona **Guardar vínculo**.
 2. Selecciona **Buscar actualizaciones** en Inicio o **Recargar versiones** en los detalles del plugin.
 3. Lee las notas, elige la versión que quieres e inicia su instalación.
 
@@ -133,7 +133,7 @@ Abre **Sideloader** en QAM y elige la ruta que corresponda.
 
 ### Confirmar y seguir la instalación
 
-Sigue las indicaciones para iniciar la preparación. Cuando termine, confirma la instalación en la ventana nativa de Decky. La tarea muestra el progreso y el resultado; al finalizar, vuelve a la lista de plugins.
+Sigue las indicaciones para iniciar la preparación. Si el paquete presenta advertencias, revísalas en el diálogo antes de continuar; después confirma la instalación en la ventana nativa de Decky. La tarea muestra el progreso y el resultado; al finalizar, vuelve a la lista de plugins.
 
 Usa **A** para activar un elemento y **B** para volver. Los borradores, versiones elegidas y estado de la tarea se conservan al cerrar y reabrir QAM.
 
@@ -188,6 +188,12 @@ Los detalles conservan la última lista obtenida correctamente hasta que la reca
 Abre **Mantenimiento del plugin** en los detalles para reinstalar la misma versión, desinstalar y reinstalar, cambiar el enlace o eliminar el plugin. Las actualizaciones normales usan las acciones de versión en los detalles.
 
 Para usar una versión GitHub de un plugin de la tienda, abre **Ajustes → Plugins de la tienda** y asume expresamente su gestión. Esto pausa sus comprobaciones nativas de la tienda. **Devolver a la tienda** restaura la configuración de actualizaciones anterior.
+
+### Mapa de repositorios
+
+Abre **Ajustes → Mapa de repositorios → Actualizar mapa** para descargar la versión más reciente sin actualizar Sideloader. Al abrir el plugin solo se usan datos locales, sin descargar el mapa. Se usa la revisión válida más reciente entre el mapa incluido y el descargado; si la actualización falla, se conserva el actual. Se mantienen los enlaces manuales, los repositorios confirmados por instalaciones completadas o por la gestión de la tienda y las decisiones de detener el seguimiento. Finaliza las instalaciones y comprobaciones de versiones antes de actualizar el mapa.
+
+La fuente mantenida es [`data/repositories.json`](../../data/repositories.json). Las claves coinciden exactamente con el `plugin.json.name` del proyecto, incluidos los proyectos de un monorepo; los valores usan `owner/repo` de GitHub. Verifica el manifiesto antes de añadir una entrada, incrementa `revision`, actualiza `updated_at` y ejecuta `python3 -B scripts/check-repository-map.py`. CI también compara la revisión con el commit base. El paquete incluye la instantánea revisada de su commit, sin descargar datos durante la compilación. Un enlace no asume la gestión de un plugin de la tienda.
 
 <details>
 <summary>Ajustes de conexión</summary>
