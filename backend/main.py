@@ -5,18 +5,22 @@ from sideload.settings_api import SettingsAPI
 from sideload.library import PluginLibrary
 from sideload.releases_api import ReleasesAPI
 from sideload.installation_api import InstallationAPI
+from sideload.self_update import SelfUpdateAPI
 
 
-class Plugin(DiagnosticsAPI, SettingsAPI, PluginLibrary, ReleasesAPI, InstallationAPI):
+class Plugin(DiagnosticsAPI, SettingsAPI, PluginLibrary, ReleasesAPI, InstallationAPI, SelfUpdateAPI):
     async def _main(self):
         self._diagnostic_service()
         self._diagnostic("startup")
+        self._self_update_init()
         decky.logger.info("decky-sideloader starting")
         self._poll_task = asyncio.create_task(self._poll_loop())
         self._backup_task = asyncio.create_task(self._backup_loop())
 
     async def _unload(self):
         self._catalog_closing = True
+        if hasattr(self, "_self_record"):
+            await self._self_update_unload()
         backup_task = getattr(self, "_backup_task", None)
         if backup_task:
             backup_task.cancel()

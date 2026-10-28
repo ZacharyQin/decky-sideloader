@@ -113,7 +113,7 @@ Os nomes seguintes correspondem à interface inglesa do Decky:
 5. Lê a confirmação do Decky e seleciona o ZIP preparado.
 6. Regressa à lista de plugins e abre **Sideloader**.
 
-Para atualizar o próprio Sideloader, instala um ZIP mais recente pelo mesmo processo do Decky. Para o remover, usa **Plugins** nas definições do Decky.
+Para atualizar o Sideloader, abre **Definições → Atualizações do Sideloader**. Para o remover, usa **Plugins** nas definições do Decky.
 
 <h2 id="try-it">Primeira utilização</h2>
 
@@ -151,7 +151,7 @@ Usa **A** para ativar um item e **B** para voltar. Os rascunhos, versões escolh
 
 ### Conteúdo e localização das cópias
 
-Antes de substituir um plugin, são copiados os diretórios Decky padrão `settings/<folder>` e `data/<folder>`. Os caminhos personalizados não estão incluídos; não há restauro nem reversão automática.
+Antes de substituir outro plugin instalado, são copiados os diretórios Decky padrão `settings/<folder>` e `data/<folder>`. Os caminhos personalizados não estão incluídos; não há restauro nem reversão automática.
 
 A página da tarefa mostra os dados copiados e onde a cópia foi guardada. A localização habitual é:
 
@@ -188,6 +188,12 @@ Os detalhes mantêm a última lista obtida com sucesso até a recarregares ou ve
 Abre **Manutenção do plugin** nos detalhes para reinstalar a mesma versão, desinstalar e reinstalar, alterar a associação ou remover o plugin. As atualizações normais usam as ações de versão nos detalhes.
 
 Para usar uma versão GitHub num plugin da loja, abre **Definições → Plugins da loja** e assume explicitamente a gestão. Isto suspende as verificações nativas da loja. **Devolver à loja** restaura a definição de atualizações anterior.
+
+### Atualizações do Sideloader
+
+Abre **Definições → Atualizações do Sideloader → Procurar atualizações do Sideloader**. As verificações da página inicial e periódicas também incluem o Sideloader, com o intervalo e as notificações existentes. Apenas são propostas versões estáveis mais recentes de `ZacharyQin/decky-sideloader`. Abrir as definições lê o resultado guardado sem aceder à rede.
+
+Descarrega a atualização e continua para a confirmação nativa do Decky. A preparação verifica a soma de verificação, a identidade/versão do pacote e a compilação frontend. Após recarregar, a conclusão exige que backend, frontend e ficheiros instalados correspondam ao destino. Podes cancelar a preparação ou uma confirmação pendente conhecida, mas não a substituição já iniciada pelo Loader. Resultados incertos e recargas não repetem a instalação. Os dados settings/data mantêm-se no lugar, sem restaurar dados antigos nem criar a cópia de dados usada para outros plugins.
 
 ### Mapa de repositórios
 

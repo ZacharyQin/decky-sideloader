@@ -77,7 +77,7 @@ export type InstallOperation = {
   backup: { paths: string[]; files: number; bytes: number; archive: string; sha256: string; scope: string; created_at: string } | null;
 };
 
-export type ScheduledCheckEvent = { report: CheckReport; checkNotifications: boolean };
+export type ScheduledCheckEvent = { report: CheckReport; checkNotifications: boolean; self_update?: SelfUpdateStatus | null };
 
 export type DiagnosticPackage = Extract<DiagnosticStatus, { state: "success" }>;
 export type DiagnosticShare = {
@@ -106,4 +106,17 @@ export type LicenseEntry = {
   id: string; name: string; version: string; group: string; host: boolean;
   license: string; source: string; attribution: string; note?: string;
   documents: { title: string; text: string }[];
+};
+
+export type FrontendIdentity = { version: string; fingerprint: string };
+export type SelfUpdateRelease = ReleaseRow & { version: string; sha256: string; asset_id: number; size: number };
+export type SelfUpdateOperation = {
+  id: string; stage: "downloading" | "ready" | "awaiting" | "installing" | "verifying" | "unknown" | "completed" | "cancelled" | "failed";
+  release: SelfUpdateRelease; artifact: string; request_id: string | null; saw_start: boolean; cancel_requested: boolean; error: string | null;
+  package: { name: string; folder: string; version: string; sha256: string; warnings: string[] } | null;
+  progress?: { received: number; total: number | null; status: string; route: string; attempt: number };
+};
+export type SelfUpdateStatus = {
+  current: string; check: { status: "update" | "current" | "ahead" | "error"; release: SelfUpdateRelease | null; checked_at: string; error: string | null } | null;
+  operation: SelfUpdateOperation | null; checking: boolean; preparing: boolean; frontend_compatible: boolean; error: string | null;
 };

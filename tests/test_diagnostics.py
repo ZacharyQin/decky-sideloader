@@ -384,7 +384,9 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         logger.setLevel(logging.INFO)
         plugin = main.Plugin()
         with patch.multiple(main.decky, create=True, logger=logger, DECKY_PLUGIN_LOG_DIR=str(self.root / "lifecycle-logs"),
-                DECKY_PLUGIN_LOG=str(sdk_file), DECKY_USER_HOME=str(self.home), DECKY_PLUGIN_VERSION="0.9.7", DECKY_VERSION="v3.2.10"):
+                DECKY_PLUGIN_LOG=str(sdk_file), DECKY_USER_HOME=str(self.home), DECKY_PLUGIN_VERSION="0.9.7", DECKY_VERSION="v3.2.10",
+                DECKY_HOME=str(self.root), DECKY_PLUGIN_NAME="Sideloader", DECKY_PLUGIN_DIR=str(self.root / "plugins/decky-sideloader"),
+                DECKY_PLUGIN_RUNTIME_DIR=str(self.root / "data/decky-sideloader"), DECKY_PLUGIN_SETTINGS_DIR=str(self.root / "settings/decky-sideloader")):
             await plugin._main()
             self.assertNotIn(sdk, logger.handlers)
             self.assertFalse(plugin._poll_task.done())

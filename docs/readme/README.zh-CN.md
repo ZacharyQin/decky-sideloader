@@ -113,7 +113,7 @@ decky-sideloader 是 Steam Deck 的 Decky 插件。它将已安装插件与 GitH
 5. 阅读 Decky 的确认内容并选择打包好的 ZIP。
 6. 返回插件列表，打开 **Sideloader**。
 
-更新 Sideloader 本身时，用同样的 Decky 流程安装新版 ZIP。卸载本插件请使用 Decky 设置中的 **Plugins**。
+更新 Sideloader 本身请进入“设置 → Sideloader 更新”。卸载本插件请使用 Decky 设置中的 **Plugins**。
 
 <h2 id="try-it">首次使用</h2>
 
@@ -151,7 +151,7 @@ decky-sideloader 是 Steam Deck 的 Decky 插件。它将已安装插件与 GitH
 
 ### 备份内容与保存位置
 
-替换已有插件前，会备份其 Decky 标准 `settings/<folder>` 和 `data/<folder>` 目录。不包含自定义路径，也不自动恢复或回滚。
+替换其他已有插件前，会备份其 Decky 标准 `settings/<folder>` 和 `data/<folder>` 目录。不包含自定义路径，也不自动恢复或回滚。
 
 可以在任务页查看这次备份包含哪些数据，以及备份文件保存在哪里。通常位于：
 
@@ -188,6 +188,12 @@ decky-sideloader 是 Steam Deck 的 Decky 插件。它将已安装插件与 GitH
 在插件详情进入“维护此插件”，可以同版重装、卸载并重新安装、更改仓库关联或移除插件。日常更新直接使用详情中的版本操作。
 
 需要让商店插件使用 GitHub 版本时，进入“设置 → 商店插件”，明确接管目标插件；接管后暂停其原生商店更新检查。“交还商店”会恢复接管前的商店更新设置。
+
+### Sideloader 更新
+
+进入“设置 → Sideloader 更新 → 检查 Sideloader 更新”。首页和定时检查也会检查 Sideloader，定时检查沿用现有间隔和通知设置；只提供 `ZacharyQin/decky-sideloader` 的更高正式版本。打开设置只读取已保存结果，不自动联网。
+
+下载可用更新后，继续到 Decky 原生安装确认。准备阶段核对发布校验值、包身份与版本、前端构建；重载后，只有运行中的前后端及安装文件均匹配目标才自动完成。可以取消准备或已知的待确认请求，但不能中断 Loader 已开始的程序替换。重载及未知结果不自动重放安装。自更新保留原有标准 settings/data，不回灌旧数据，也不生成普通其他插件安装的数据备份。
 
 ### 仓库映射表
 

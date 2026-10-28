@@ -11,6 +11,7 @@ from sideload.persist import load_settings, save_settings
 from sideload.releases_api import _releases_for
 from sideload.rpc import _observed_rpc
 from sideload.scan import read_plugins_dir
+from sideload.self_update import require_no_self_update
 
 
 class InstallationAPI:
@@ -93,6 +94,7 @@ class InstallationAPI:
             return await self._prepare_install(repo, tag, asset_url, existing_name, plugin_path, mode)
 
     async def _prepare_install(self, repo, tag, asset_url, existing_name, plugin_path, mode):
+        require_no_self_update(self)
         parsed = parse_github_input(repo)
         if not parsed or not isinstance(tag, str) or not isinstance(asset_url, str):
             raise RuntimeError("仓库、版本或安装包无效")

@@ -7,7 +7,7 @@ from sideload.diagnostic_context import CONTEXT, error_fields, identifier
 
 
 def _observed_rpc(method):
-    failure_only = method.__name__ == "get_operation"
+    failure_only = method.__name__ in {"get_operation", "get_self_update_status"}
     signature = inspect.signature(method)
     @wraps(method)
     async def observed(self, *args, **kwargs):

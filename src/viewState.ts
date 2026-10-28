@@ -27,7 +27,7 @@ type ViewState = {
   operationOrigin: "home" | "install" | "details";
   bindingOrigin: "details" | "maintenance";
   networkOrigin: "settings" | "details";
-  releaseNotes: { release: ReleaseRow; origin: "details" | "install" } | null;
+  releaseNotes: { release: ReleaseRow; origin: "details" | "install" | "settings" } | null;
   releaseNotesFocus: boolean;
   settingsFocus: boolean;
   networkFocus: boolean;

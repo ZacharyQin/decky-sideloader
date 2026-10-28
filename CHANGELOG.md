@@ -4,6 +4,20 @@ This file records reviewable source versions. A version commit does not imply a 
 
 本文件记录可审核的源码版本。版本提交不代表发布或已部署，版本号以 `package.json` 为准。每条记录必须英语在前、中文在后；GitHub Release 正文须使用本文件对应版本的完整章节，不以自动生成的提交摘要或整份日志代替。发布须获明确授权。
 
+## [0.5.0] - 2026-10-28
+
+### English
+
+- Add a six-language Sideloader updates section with the running version, latest stable release, last check and full release notes. Include self-update discovery in Home and scheduled checks, using the existing network, interval and notification preferences; install only after explicit preparation and Decky confirmation.
+- Restrict self-updates to newer stable packages from the fixed project repository. Recheck the selected release, verify GitHub SHA-256, package identity/version and frontend build, and keep the ordinary installation path's self-replacement protection. Prevent concurrent plugin mutations while self-update is active.
+- Persist a separate self-update intent under plugin data. Complete it only after a new backend instance, matching loaded frontend and installed file hashes agree. Drain preparation on cancellation/unload; correlate native prompts and cancellations; never replay a handoff after reload, ambiguity or failure. Keep existing settings/data and ordinary installation history untouched.
+
+### 中文
+
+- 新增六语“Sideloader 更新”设置区段，展示运行版本、最新正式版、检查时间及完整发布说明；首页和定时检查包含自身更新，沿用现有网络、间隔及通知设置，明确准备并经 Decky 确认后才安装。
+- 自更新仅接受固定项目仓库的更高正式版，重新核对所选发布及 GitHub SHA-256、包身份／版本和前端构建；普通安装路径继续禁止替换自身，自更新活动期间阻止并发插件变更。
+- 在插件 data 中独立保存更新意图，仅在新后端实例、实际加载前端和安装文件哈希共同匹配后完成；取消和卸载时排空准备任务，关联原生确认与取消，重载、歧义或失败不重放原生请求。保留现有 settings/data 和普通安装历史。
+
 ## [0.4.0] - 2026-10-27
 
 ### English

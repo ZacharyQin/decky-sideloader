@@ -113,7 +113,7 @@ The following are the English labels in Decky's interface:
 5. Read Decky's confirmation and select the packaged ZIP.
 6. Return to the plugin list and open **Sideloader**.
 
-To update Sideloader itself, install a newer packaged ZIP through the same Decky flow. To remove it, use **Plugins** in Decky's settings.
+To update Sideloader itself, open **Settings → Sideloader updates**. To remove it, use **Plugins** in Decky's settings.
 
 <h2 id="try-it">First use</h2>
 
@@ -151,7 +151,7 @@ Use **A** to activate an item and **B** to return. Search drafts, version choice
 
 ### What is backed up and where
 
-Before replacing an existing plugin, decky-sideloader backs up its standard Decky `settings/<folder>` and `data/<folder>` directories. Custom paths are not included, and there is no automatic restore or rollback.
+Before replacing another installed plugin, decky-sideloader backs up its standard Decky `settings/<folder>` and `data/<folder>` directories. Custom paths are not included, and there is no automatic restore or rollback.
 
 The task page shows which data was backed up and where the backup is saved. The usual location is:
 
@@ -188,6 +188,12 @@ Details keep the last successfully loaded release list until you reload it or ch
 Open **Plugin maintenance** in a plugin's details to reinstall the same version, uninstall and reinstall, change its repository link, or remove it. Routine updates use the version actions in details.
 
 To use a GitHub release for a store-managed plugin, open **Settings → Store plugins** and explicitly take over the plugin. This pauses its native store update checks. **Return to store** restores its previous store-update setting.
+
+### Sideloader updates
+
+Open **Settings → Sideloader updates → Check for Sideloader updates**. Home and scheduled checks also check Sideloader; scheduled checks follow the existing interval and notification settings. Only newer stable releases from `ZacharyQin/decky-sideloader` are offered. Opening Settings reads the saved result without a network request.
+
+Download an available update, then continue to Decky's native installation confirmation. Preparation checks the release checksum, package identity/version and frontend build. A reloaded instance completes the update only after the running backend, frontend and installed files match. Cancellation stops preparation or a known pending confirmation, not a replacement already started by Loader. Reloads and uncertain results never replay installation. Self-update keeps standard settings/data in place and does not restore old data or create the ordinary other-plugin data backup.
 
 ### Repository map
 

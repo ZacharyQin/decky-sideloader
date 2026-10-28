@@ -30,6 +30,7 @@ import { presentationStyles } from "./presentation";
 import { startNativeManagement } from "./nativeManagement";
 import { DiagnosticBoundary } from "./DiagnosticBoundary";
 import { returnToPluginList } from "./loaderBridge";
+import { receiveSelfUpdate, receiveSelfUpdateLoaderEvent, startSelfUpdateController } from "./selfUpdateController";
 
 function Content() {
   useLocale();
@@ -144,15 +145,20 @@ export default definePlugin(() => {
   const stopNativeManagement = startNativeManagement();
   const stopDiagnostics = startDiagnostics({ record: recordDiagnosticEvents, export: exportDiagnostics, status: getDiagnosticsStatus,
     sharing: { addresses: getDiagnosticsAddresses, status: getDiagnosticsShare, start: startDiagnosticsShare, stop: stopDiagnosticsShare } });
-  const stopInstallController = startInstallController();
+  const stopSelfUpdate = startSelfUpdateController();
+  const stopInstallController = startInstallController(receiveSelfUpdateLoaderEvent);
   const listener = addEventListener<[event: ScheduledCheckEvent]>("scheduled_check_completed", (event) => {
-    if (receiveScheduledCheck(event)) toastInfo(checkReportSummary(event.report));
+    receiveSelfUpdate(event.self_update);
+    if (receiveScheduledCheck(event)) {
+      const update = event.self_update?.check;
+      toastInfo(update?.status === "update" && update.release ? `${checkReportSummary(event.report)} · ${t("Sideloader 新版本：{0}", [update.release.version])}` : checkReportSummary(event.report));
+    }
   });
   return {
     name: "Sideloader",
     titleView: <div className={staticClasses.Title}>Sideloader</div>,
     content: <DiagnosticBoundary><Content /></DiagnosticBoundary>,
     icon: <FaGithub />,
-    onDismount() { stopNativeManagement(); disposeReleaseReads(); stopOwnershipController(); stopDiagnostics(); stopInstallController(); removeEventListener("scheduled_check_completed", listener); },
+    onDismount() { stopSelfUpdate(); stopNativeManagement(); disposeReleaseReads(); stopOwnershipController(); stopDiagnostics(); stopInstallController(); removeEventListener("scheduled_check_completed", listener); },
   };
 });

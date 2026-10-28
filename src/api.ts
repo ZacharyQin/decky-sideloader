@@ -4,6 +4,17 @@ import { callable } from "@decky/api";
 import type { AppSettings, InstallOperation, PluginListResponse, ReleaseRow, ReleaseReadResult, RepositoryRow, RepositoryProbe, NetworkMode, DiagnosticEvent, DiagnosticStatus, DiagnosticShare, OwnershipIntent } from "./types";
 import type { BackupCleanup, LicenseEntry, RepositoryMapStatus, RepositoryMapUpdate } from "./types";
 import { cleanDiagnosticEvent } from "./diagnosticEvents";
+import { frontendIdentity } from "./build";
+import type { SelfUpdateStatus, FrontendIdentity } from "./types";
+
+const readSelfUpdate = callable<[frontend: FrontendIdentity | null], SelfUpdateStatus>("get_self_update_status");
+export const getSelfUpdateStatus = () => readSelfUpdate(frontendIdentity);
+export const checkSelfUpdate = callable<[], SelfUpdateStatus>("check_self_update");
+export const prepareSelfUpdate = callable<[tag: string, sha256: string], SelfUpdateStatus>("prepare_self_update");
+const submitSelf = callable<[identifier: string, frontend: FrontendIdentity | null], SelfUpdateStatus>("submit_self_update");
+export const submitSelfUpdate = (identifier: string) => submitSelf(identifier, frontendIdentity);
+export const cancelSelfUpdate = callable<[identifier: string], SelfUpdateStatus>("cancel_self_update");
+export const recordSelfUpdateEvent = callable<[identifier: string, kind: string, value?: string, evidence?: string], SelfUpdateStatus>("record_self_update_event");
 
 const readDiskPlugins = callable<[refresh?: boolean], PluginListResponse>("list_sideload_plugins");
 const checkDiskUpdates = callable<[], PluginListResponse>("check_updates");

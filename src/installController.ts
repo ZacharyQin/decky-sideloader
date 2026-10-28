@@ -304,7 +304,7 @@ async function refreshAfterUninstall(name: string, currentGeneration: number): P
   } catch (error) { if (currentGeneration === generation) toastError(error); }
 }
 
-export function startInstallController(): () => void {
+export function startInstallController(onLoaderEvent?: (...event: Parameters<Parameters<typeof listenForInstallEvents>[0]>) => void): () => void {
   const currentGeneration = ++generation;
   let disposed = false;
   type InstallEvent = Parameters<Parameters<typeof listenForInstallEvents>[0]>;
@@ -328,6 +328,7 @@ export function startInstallController(): () => void {
     for (const event of events) recordEvent(operation, event);
   };
   const stopEvents = listenForInstallEvents((...event) => {
+    onLoaderEvent?.(...event);
     if (event[0] === "uninstall_returned") {
       const op = snapshot.operation;
       if (!(isActive(op) && op?.mode === "reinstall" && op.package?.name === event[1])) {

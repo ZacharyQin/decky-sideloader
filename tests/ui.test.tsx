@@ -3,6 +3,7 @@ import React, { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import type { AppSettings, CheckReport, InstallOperation, PluginListResponse, PluginRow, ReleaseRow, ReleaseReadResult, ReleaseSnapshot, RepositoryRow, RepositoryProbe, DiagnosticStatus, DiagnosticShare } from "../src/types";
 import { setLocale } from "../src/i18n";
+import type { SelfUpdateStatus } from "../src/types";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 const eventHandlers = new Map<string, (...args: any[]) => void>();
@@ -42,6 +43,7 @@ let listing: PluginListResponse;
 let releases: ReleaseRow[];
 let operation: InstallOperation | null;
 let settings: AppSettings;
+let selfStatus: SelfUpdateStatus;
 function releaseResult(subject = plugin, rows = releases): ReleaseReadResult {
   const snapshot: ReleaseSnapshot = { name: subject.name, folder: subject.folder, repo: subject.repo!, current: subject.version, ownership_id: subject.ownership?.intent?.id ?? null,
     checkedAt: "2026-10-25T00:00:00Z", releases: rows };
@@ -67,6 +69,12 @@ const api = {
   getAppSettings: mock(async () => settings), setCheckNotifications: mock(async () => settings), setShowHomeTaskNotice: mock(async (enabled: boolean) => (settings = { ...settings, showHomeTaskNotice: enabled })), setDeletePackageAfterInstall: mock(async (enabled: boolean) => (settings = { ...settings, deletePackageAfterInstall: enabled })), setDownloadTimeout: mock(async (minutes: number) => (settings = { ...settings, downloadTimeoutMinutes: minutes })), setSkippedRelease: mock(async () => listing), setAutoCheck: mock(async () => settings), setNetworkMode: mock(async () => settings),
   getRepositoryMapStatus: mock(async () => ({ revision: 1, updated_at: "2026-10-27", count: 35, source: "bundled" as const, warning: null })),
   updateRepositoryMap: mock(async () => ({ revision: 2, updated_at: "2026-10-28", count: 36, source: "downloaded" as const, warning: null, changed: true })),
+  getSelfUpdateStatus: mock(async (): Promise<SelfUpdateStatus> => selfStatus),
+  checkSelfUpdate: mock(async (): Promise<SelfUpdateStatus> => selfStatus),
+  prepareSelfUpdate: mock(async (): Promise<SelfUpdateStatus> => selfStatus),
+  submitSelfUpdate: mock(async (): Promise<SelfUpdateStatus> => selfStatus),
+  cancelSelfUpdate: mock(async (): Promise<SelfUpdateStatus> => selfStatus),
+  recordSelfUpdateEvent: mock(async (): Promise<SelfUpdateStatus> => selfStatus),
   getOpenSourceNotices: mock(async () => ({ entries: [{ id: "sample", name: "Sample", version: "1.0", group: "transitive", host: false,
     license: "MIT", source: "https://example.com", attribution: "Example", documents: [{ title: "LICENSE", text: "Copyright Example\n\nPermission granted.\n" }] }] })),
   setBinding: mock(async () => ({ name: "Example", repo: "acme/example" })), clearBinding: mock(async () => undefined),
@@ -96,6 +104,8 @@ const { resetViewState } = await import("../src/viewState");
 const { Action } = await import("../src/components");
 const { DiagnosticsSettings } = await import("../src/DiagnosticsSettings");
 const { default: makePlugin } = await import("../src/index");
+const selfController = await import("../src/selfUpdateController");
+const { SelfUpdateSettings } = await import("../src/SelfUpdateSettings");
 let roots: ReactTestRenderer[] = [];
 let stop: (() => void) | null = null;
 let loaderCall: ReturnType<typeof mock>;
@@ -106,6 +116,9 @@ const makeOperation = (): InstallOperation => ({
   package: { name: "Example", folder: "example", version: "2.0.0", sha256: "a".repeat(64), warnings: [] },
 });
 beforeEach(async () => {
+  selfStatus = { current: "0.5.0", check: null, operation: null, checking: false, preparing: false, frontend_compatible: true, error: null };
+  for (const fn of [api.getSelfUpdateStatus, api.checkSelfUpdate, api.prepareSelfUpdate, api.submitSelfUpdate, api.cancelSelfUpdate, api.recordSelfUpdateEvent]) fn.mockReset().mockImplementation(async () => selfStatus);
+  await selfController.refreshSelfUpdate();
   setLocale("zh-cn");
   api.authorizePluginMutation.mockReset().mockImplementation(async () => undefined);
   api.beginStoreOwnership.mockReset().mockImplementation(async () => ({ id: "a".repeat(32), name: "Example", folder: "example", repo: "acme/example", prior_frozen: false, action: "takeover", state: "prepared" }));
@@ -3224,4 +3237,82 @@ test("repository map update remains in flight across a QAM remount", async () =>
   expect(action().props["aria-busy"]).toBe(false);
   expect(api.updateRepositoryMap).toHaveBeenCalledTimes(1);
   expect(reopened.root.findAllByType(Status).some(node => String(node.props.title).includes("36"))).toBe(true);
+});
+
+function selfRelease(): NonNullable<NonNullable<SelfUpdateStatus["check"]>["release"]> {
+  return { ...release, repo: "ZacharyQin/decky-sideloader", tag: "v0.6.0", version: "0.6.0", sha256: "c".repeat(64), asset_id: 123, size: 100,
+    zips: [{ name: "decky-sideloader-0.6.0.zip", url: "https://github.com/ZacharyQin/decky-sideloader/releases/download/v0.6.0/decky-sideloader-0.6.0.zip" }] };
+}
+function readySelfUpdate() {
+  const target = selfRelease();
+  selfStatus = { ...selfStatus, check: { status: "update", release: target, checked_at: "2026-10-27T00:00:00Z", error: null },
+    operation: { id: "d".repeat(32), stage: "ready", release: target, artifact: `file:///home/deck/homebrew/data/decky-sideloader/self-update/${"d".repeat(32)}/plugin.zip`,
+      request_id: null, saw_start: false, cancel_requested: false, error: null,
+      package: { name: "Sideloader", folder: "decky-sideloader", version: target.version, sha256: target.sha256, warnings: [] } } };
+}
+
+test("self update ignores an older status read arriving after a completed check", async () => {
+  const old = selfStatus;
+  let finish!: (value: SelfUpdateStatus) => void;
+  api.getSelfUpdateStatus.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const root = await mount(<SelfUpdateSettings />);
+  api.checkSelfUpdate.mockImplementationOnce(async () => {
+    selfStatus = { ...selfStatus, check: { status: "update", release: selfRelease(), checked_at: "2026-10-27T00:00:00Z", error: null } };
+    return selfStatus;
+  });
+  await act(async () => { await selfController.checkForSelfUpdate(); });
+  expect(buttons(root).some(button => button.props["data-action-key"] === "selfUpdateDownload")).toBe(true);
+  await act(async () => { finish(old); });
+  expect(buttons(root).some(button => button.props["data-action-key"] === "selfUpdateDownload")).toBe(true);
+});
+
+test("self update cannot offer a downgrade when the installed version is ahead", async () => {
+  selfStatus = { ...selfStatus, check: { status: "ahead", release: { ...selfRelease(), version: "0.4.0", tag: "v0.4.0", comparison: -1 }, checked_at: "2026-10-27T00:00:00Z", error: null } };
+  const root = await mount(<SelfUpdateSettings />);
+  expect(buttons(root).some(button => button.props["data-action-key"] === "selfUpdateDownload")).toBe(false);
+  await act(async () => { await selfController.downloadSelfUpdate(); });
+  expect(api.prepareSelfUpdate).not.toHaveBeenCalled();
+  expect(loaderCall).not.toHaveBeenCalled();
+});
+
+test("reopening a ready self update never replays a native installation", async () => {
+  readySelfUpdate();
+  const first = await mount(<SelfUpdateSettings />);
+  await unmount(first);
+  const reopened = await mount(<SelfUpdateSettings />);
+  expect(buttons(reopened).some(button => button.props["data-action-key"] === "selfUpdateInstall" && !button.props.disabled)).toBe(true);
+  expect(api.submitSelfUpdate).not.toHaveBeenCalled();
+  expect(loaderCall).not.toHaveBeenCalled();
+});
+
+test("self update ignores late warning approval after its instance is stopped", async () => {
+  readySelfUpdate();
+  selfStatus.operation!.package!.warnings = ["此插件声明了 root 权限，请仅安装可信作者的发布。"];
+  stop = selfController.startSelfUpdateController();
+  await selfController.refreshSelfUpdate();
+  await act(async () => { void selfController.installPreparedSelfUpdate(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
+  const approve = nativeModal!.props.onOK;
+  stop(); stop = null;
+  await act(async () => { approve(); for (let i = 0; i < 20; i++) await Promise.resolve(); });
+  expect(api.submitSelfUpdate).not.toHaveBeenCalled();
+  expect(loaderCall).not.toHaveBeenCalled();
+});
+
+test("known native self-update cancellation after reload releases the pending task", async () => {
+  readySelfUpdate();
+  selfStatus.operation = { ...selfStatus.operation!, stage: "awaiting", request_id: "old-native-request" };
+  api.cancelSelfUpdate.mockImplementationOnce(async () => {
+    selfStatus = { ...selfStatus, operation: { ...selfStatus.operation!, cancel_requested: true } };
+    return selfStatus;
+  });
+  api.recordSelfUpdateEvent.mockImplementation(async (...args: unknown[]) => {
+    if (args[1] === "cancelled" && args[3] === "old-native-request") selfStatus = { ...selfStatus, operation: { ...selfStatus.operation!, stage: "cancelled" } };
+    return selfStatus;
+  });
+  stop = selfController.startSelfUpdateController();
+  await selfController.refreshSelfUpdate();
+  const root = await mount(<SelfUpdateSettings />);
+  await act(async () => { await selfController.cancelCurrentSelfUpdate(); });
+  expect(buttons(root).some(button => button.props["data-action-key"] === "selfUpdateCancel")).toBe(false);
+  expect(buttons(root).find(button => button.props["data-action-key"] === "selfUpdateCheck")!.props.disabled).toBe(false);
 });
