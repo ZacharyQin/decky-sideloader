@@ -1,0 +1,10 @@
+{
+  "schema":1,
+  "self_version":"0.6.0",
+  "expected":[
+    {"name":"Example","repo":"fixture/example","current":"1.0.0","latest":"2.0.0","status":"update"},
+    {"name":"Other Fixture","repo":"fixture/other","current":"1.0.0","latest":null,"status":"error"}
+  ],
+  "toast":"Updates 1, current 0, failed 1, unlinked 0, uncertain 0",
+  "cases":[{"id":"checks_manual","action":"manual"},{"id":"checks_scheduled","action":"scheduled","detached_case":"checks_scheduled_unmounted"}]
+}

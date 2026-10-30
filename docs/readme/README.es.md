@@ -113,7 +113,7 @@ Los siguientes nombres corresponden a la interfaz de Decky en inglés:
 5. Lee la confirmación de Decky y selecciona el ZIP preparado.
 6. Vuelve a la lista de plugins y abre **Sideloader**.
 
-Para actualizar el propio Sideloader, instala un ZIP más reciente mediante el mismo proceso de Decky. Para eliminarlo, usa **Plugins** en los ajustes de Decky.
+Para actualizar Sideloader, abre **Ajustes → Actualizaciones de Sideloader**. Para eliminarlo, usa **Plugins** en los ajustes de Decky.
 
 <h2 id="try-it">Primer uso</h2>
 
@@ -151,7 +151,7 @@ Usa **A** para activar un elemento y **B** para volver. Los borradores, versione
 
 ### Qué se copia y dónde se guarda
 
-Antes de sustituir un plugin, se copian sus directorios estándar de Decky `settings/<folder>` y `data/<folder>`. No se incluyen rutas personalizadas ni hay restauración o reversión automática.
+Antes de sustituir otro plugin instalado, se copian sus directorios estándar de Decky `settings/<folder>` y `data/<folder>`. No se incluyen rutas personalizadas ni hay restauración o reversión automática.
 
 La tarea muestra qué datos se copiaron y dónde se guardó la copia. La ubicación habitual es:
 
@@ -188,6 +188,12 @@ Los detalles conservan la última lista obtenida correctamente hasta que la reca
 Abre **Mantenimiento del plugin** en los detalles para reinstalar la misma versión, desinstalar y reinstalar, cambiar el enlace o eliminar el plugin. Las actualizaciones normales usan las acciones de versión en los detalles.
 
 Para usar una versión GitHub de un plugin de la tienda, abre **Ajustes → Plugins de la tienda** y asume expresamente su gestión. Esto pausa sus comprobaciones nativas de la tienda. **Devolver a la tienda** restaura la configuración de actualizaciones anterior.
+
+### Actualizaciones de Sideloader
+
+Abre **Ajustes → Actualizaciones de Sideloader → Buscar actualizaciones de Sideloader**. Las comprobaciones de Inicio y periódicas también incluyen Sideloader, con el intervalo y las notificaciones existentes. Solo se ofrecen versiones estables superiores de `ZacharyQin/decky-sideloader`. Abrir Ajustes lee el resultado guardado sin acceder a la red.
+
+Descarga la actualización y continúa hasta la confirmación nativa de Decky. La preparación comprueba la suma de verificación, identidad/versión del paquete y compilación del frontend. Tras recargar, solo se completa cuando backend, frontend y archivos instalados coinciden con el destino. Puedes cancelar la preparación o una confirmación pendiente conocida, pero no un reemplazo iniciado por Loader. Las recargas y resultados inciertos no repiten la instalación. Se conservan settings/data sin restaurar datos antiguos ni crear la copia de datos utilizada para otros plugins.
 
 ### Mapa de repositorios
 
@@ -252,13 +258,15 @@ Este README está disponible en los mismos seis idiomas mediante los enlaces de 
 <details id="build">
 <summary>Compilar desde el código fuente</summary>
 
-Necesitas Node.js, pnpm, Bun y Python 3. Ejecuta estos comandos desde la raíz del repositorio:
+Compila en Linux x86-64 con Node.js, pnpm, Bun, Python 3.11+ y Rust/Cargo (Rust 1.85+). El destino predeterminado es `x86_64-unknown-linux-gnu`; CI usa Ubuntu 22.04. Ejecuta estos comandos desde la raíz del repositorio:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm test
+pnpm test:rust
 pnpm test:python
+pnpm test:reference
 pnpm build
 ```
 
@@ -268,9 +276,11 @@ Después de compilar, crea el ZIP de instalación:
 pnpm package-plugin
 ```
 
-El ZIP incluye la interfaz, el backend de Python, los avisos de licencia y los seis README. No añadas ajustes del dispositivo, registros ni copias de seguridad.
+El ZIP incluye la interfaz, el ejecutable Rust, el adaptador Python para Decky, los textos de licencia de las dependencias y los seis README. No añadas ajustes del dispositivo, registros ni copias de seguridad.
 
-El resultado es `dist/decky-sideloader-<version>.zip`. El código del backend está en `backend/main.py` y en los módulos por función de `backend/sideload/`; el empaquetado los coloca en `main.py` y `py_modules/sideload/`, como requiere Loader. No copies directamente la estructura del código fuente al dispositivo.
+El resultado es `dist/decky-sideloader-<version>.zip`. La lógica está en `backend-rs/`; `backend/main.py` solo adapta el ciclo de vida, los RPC y los eventos de Decky. El paquete los coloca en `bin/sideloader-core` y en el `main.py` exigido por Loader, con la identidad de compilación en `dist/backend.json`. `pnpm build` compila primero Rust en modo release y recopila las licencias de las versiones fijadas; `pnpm test:python` compila el ejecutable debug para pruebas con procesos reales. El backend Python 0.5.0 congelado en `tests/reference_backend/` sirve de referencia y no se distribuye. No copies directamente la estructura del código fuente al dispositivo.
+
+El adaptador Python supervisa un proceso Rust por IPC versionado en la entrada/salida estándar. Rust mantiene el estado de las tareas y la persistencia. Un proceso que falla no se reinicia automáticamente ni se repiten solicitudes nativas de resultado incierto. La actualización de Sideloader verifica el binario/compilación en ejecución, la interfaz cargada y los hashes de archivos después de iniciar una nueva instancia.
 
 El workflow de GitHub en `.github/workflows/build.yml` valida y compila las pull requests y los envíos a `main`, y sube el ZIP de instalación como artefacto. Al enviar una etiqueta `v<version>` que coincida con `package.json`, también publica una GitHub Release con el ZIP y la sección completa en inglés y chino de esa versión de `CHANGELOG.md`.
 

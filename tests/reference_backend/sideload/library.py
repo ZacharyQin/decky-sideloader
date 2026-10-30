@@ -14,6 +14,7 @@ from sideload.diagnostic_context import DiagnosticError, identifier as diagnosti
 from sideload.diagnostic_snapshot import library_snapshot
 from sideload.scan import classify_plugins, read_plugins_dir
 from sideload.repository_map import resolve_repository
+from sideload.self_update import require_no_self_update
 
 
 class PluginLibrary:
@@ -203,6 +204,7 @@ class PluginLibrary:
         return matches[0]
 
     def _require_binding_idle(self, name: str) -> None:
+        require_no_self_update(self)
         if getattr(self, "_catalog_closing", False):
             raise RuntimeError("插件正在停止，请重新打开后重试")
         if not hasattr(self, "_flow") and getattr(decky, "DECKY_PLUGIN_RUNTIME_DIR", None):

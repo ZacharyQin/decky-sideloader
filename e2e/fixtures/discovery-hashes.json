@@ -1,0 +1,23 @@
+{
+  "schema":1,
+  "packages":{
+    "alpha":{"archive":"d8d83c892d6cd43b830549b04a09cd712a5a918debf5cf62d39f6888e1efe33f","files":{
+      "plugin.json":"eb0fe194586d8e1e5816d3683cd54394917cde9a894553076295864507d9eaa2",
+      "package.json":"85dfdf4e4e7bf0554f3700cd72d3c0103990ba7dd6f8836b9aeb0ebc9758582f",
+      "dist/index.js":"e54f518fd02ad2df42750683f0e87095e7a0e0269e1c0481ca6bb930033655ae",
+      "LICENSE":"d0688aa1d5d562e816b16772805caad708b93e8e3cfdb7aecc8bb9fd1ee18a73"}},
+    "beta":{"archive":"5c2e16bd098cd2f63ff87e0a637fa9f9517af8e597b242ec582b552a5fbb26e0","files":{
+      "plugin.json":"82224ec1d5f0e567d4b37e760188683d17bbb456b72e90f398b0f46e0490d070",
+      "package.json":"c1a07643389be74535fb8e11396f4df8bc3427c037ba6f2f15d4b827a0e5ca37",
+      "main.py":"f598630c178b38ff5e41f03767cbca5c995f342d9b3e0ce4a19c9914c0dc5231",
+      "dist/index.js":"daaaabf9f950cb3e590eab1b4726cf8727ac405a37a380134a23e77a96efabe6",
+      "LICENSE":"d0688aa1d5d562e816b16772805caad708b93e8e3cfdb7aecc8bb9fd1ee18a73"},"merged_files":{
+      "plugin.json":"82224ec1d5f0e567d4b37e760188683d17bbb456b72e90f398b0f46e0490d070",
+      "package.json":"9d3231f452bff97392d4c1ceeb85f3c95b4ef4e7db5c535d99b827f9d14dc055",
+      "main.py":"f598630c178b38ff5e41f03767cbca5c995f342d9b3e0ce4a19c9914c0dc5231",
+      "dist/index.js":"daaaabf9f950cb3e590eab1b4726cf8727ac405a37a380134a23e77a96efabe6",
+      "LICENSE":"d0688aa1d5d562e816b16772805caad708b93e8e3cfdb7aecc8bb9fd1ee18a73",
+      "bin/lib-a":"9f5b9f9d381c4dfafbaf55b84522fad8365726b001ef93dd9865e9b1c1343a46",
+      "bin/lib-b":"52078ac71be35149c9ecc2f5eecad58baecbfb0194d6d6542b9e00bfdf3cfb7f"}}
+  }
+}

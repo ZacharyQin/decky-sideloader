@@ -3,6 +3,7 @@ import type { DiagnosticEvent } from "./types";
 const own = (value: object, key: PropertyKey) => Object.prototype.hasOwnProperty.call(value, key);
 export const diagnosticPages = ["home", "details", "install", "settings", "binding", "operation", "checks", "network", "diagnostics", "maintenance", "versions", "source", "releaseNotes", "licenses"] as const;
 const actions = new Set(["back", "checkUpdates", "newInstall", "settings", "binding", "manageBinding", "saveBinding", "unlink", "replace", "reinstall", "uninstall", "search", "manualRepo", "returnSearch", "readReleases", "refreshReleases", "installPackage", "changePlugin", "changeRepo", "releaseNotes", "licenses", "reloadSettings", "dismissTask", "muteTaskNotice", "viewTask", "refreshTask", "refreshRecognition", "deletePackage", "confirmInstall", "shareDiagnostics", "copyDiagnostics", "stopDiagnostics", "diagnosticDetails", "exportDiagnostics", "takeover", "returnStore", "readOwnership", "cancelRequest", "finishTracking", "skipRelease", "continueInstall", "retryDownload", "maintenance", "network", "deleteBackups", "updateRepositoryMap"]);
+for (const action of ["selfUpdateCheck", "selfUpdateDownload", "selfUpdateInstall", "selfUpdateCancel"]) actions.add(action);
 const errorTypes = new Set(["Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError", "URIError", "EvalError", "Exception"]);
 const origins = new Set(["render", "action", "global", "unhandled", "toast", "icon"]);
 const schemas: Record<string, { required: string[]; optional: string[] }> = {

@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "protected": {
+    "settings/example/preferences.json": "{\"keep\":true,\"value\":\"fixture-owned-data\"}\n",
+    "data/example/notes.bin": "fixture data must survive installation and cancellation\n"
+  },
+  "packages": {
+    "new": {
+      "name": "Fixture Target",
+      "folder": "fixture-target",
+      "version": "2.0.0",
+      "repo": "fixture/target",
+      "files": {
+        "plugin.json": "{\"name\":\"Fixture Target\",\"author\":\"Fixture\",\"flags\":[]}\n",
+        "package.json": "{\"name\":\"fixture-target\",\"version\":\"2.0.0\",\"repository\":\"fixture/target\"}\n",
+        "main.py": "# deterministic fixture target 2.0.0\n",
+        "dist/index.js": "export const fixtureVersion = '2.0.0';\n",
+        "bin/dependency-a": "fixture dependency alpha\n",
+        "bin/dependency-b": "fixture dependency beta\n"
+      }
+    },
+    "overwrite": {
+      "name": "Example",
+      "folder": "example",
+      "version": "2.0.0",
+      "repo": "fixture/example",
+      "files": {
+        "plugin.json": "{\"name\":\"Example\",\"author\":\"Fixture\",\"flags\":[]}\n",
+        "package.json": "{\"name\":\"example\",\"version\":\"2.0.0\",\"repository\":\"fixture/example\"}\n",
+        "main.py": "# deterministic fixture example 2.0.0\n",
+        "dist/index.js": "export const fixtureVersion = '2.0.0';\n",
+        "bin/dependency-a": "fixture dependency alpha\n",
+        "bin/dependency-b": "fixture dependency beta\n"
+      }
+    }
+  },
+  "downloads": [
+    {"id":"download_success","source":"download","package":"new","native":"success","stage":"closed","outcome":"success","dispatches":1,"confirms":1,"cancels":0},
+    {"id":"download_bad_zip","source":"download","package":"new","native":"none","stage":"failed","outcome":null,"dispatches":0,"confirms":0,"cancels":0}
+  ],
+  "cases": [
+    {"id":"fresh_success","package":"new","action":"install","native":"success","stage":"closed","outcome":"success","dispatches":1,"confirms":1,"cancels":0},
+    {"id":"overwrite_success","package":"overwrite","action":"install","native":"success","stage":"closed","outcome":"success","dispatches":1,"confirms":1,"cancels":0},
+    {"id":"cancel_ready","package":"new","action":"cancel_ready","native":"none","stage":"cancelled","outcome":null,"dispatches":0,"confirms":0,"cancels":0},
+    {"id":"bad_package","package":"new","action":"install","native":"none","tamper":"archive","stage":"failed","outcome":null,"dispatches":0,"confirms":0,"cancels":0},
+    {"id":"bad_backup","package":"overwrite","action":"install","native":"none","tamper":"backup","stage":"failed","outcome":null,"dispatches":0,"confirms":0,"cancels":0},
+    {"id":"wrong_hash","package":"new","action":"install","native":"wrong_hash","stage":"unknown","outcome":null,"dispatches":1,"confirms":1,"cancels":0},
+    {"id":"wrong_request","package":"new","action":"install","native":"wrong_request","stage":"unknown","outcome":null,"dispatches":1,"confirms":1,"cancels":0},
+    {"id":"missing_start","package":"new","action":"install","native":"missing_start","stage":"failed","outcome":null,"dispatches":1,"confirms":1,"cancels":0},
+    {"id":"wrong_name","package":"new","action":"install","native":"wrong_name","stage":"awaiting","outcome":null,"dispatches":1,"confirms":1,"cancels":0},
+    {"id":"tampered_file","package":"new","action":"install","native":"tampered_file","stage":"failed","outcome":null,"dispatches":1,"confirms":1,"cancels":0},
+    {"id":"cancel_prompt","package":"new","action":"cancel_prompt","native":"manual","stage":"cancelled","outcome":null,"dispatches":1,"confirms":0,"cancels":1},
+    {"id":"restarted_unknown","package":"new","action":"restart_unknown","native":"manual","stage":"unknown","outcome":null,"dispatches":1,"confirms":0,"cancels":0}
+  ]
+}

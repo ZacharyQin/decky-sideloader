@@ -1,0 +1,11 @@
+{
+  "schema":1,
+  "api":"https://api.github.com/repos/DeckThemes/SDH-CssLoader/releases/tags/v2.1.2",
+  "tag":"v2.1.2",
+  "name":"SDH-CSSLoader-Decky.zip",
+  "asset":"https://github.com/DeckThemes/SDH-CssLoader/releases/download/v2.1.2/SDH-CSSLoader-Decky.zip",
+  "bytes":188377,
+  "sha256":"0105b29cba25eacbfb8574b8a72e24b82cd1a8fb1ea6a9b3460597c9583e79ed",
+  "publisher_digest":null,
+  "reference":"Independent Python urllib direct HTTPS, default certificate verification, no environment proxy; downloaded 2026-10-30. GitHub release metadata supplied tag/name/size; SHA is an independent byte-comparison reference, not a publisher signature."
+}

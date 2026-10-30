@@ -15,8 +15,8 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,6 +31,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+          components: rustfmt, clippy, rust-docs
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend-rs -> target
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.2"
@@ -39,10 +46,23 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python3 -B scripts/check-repository-map.py --base-ref "$BASE_REF"
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm test:python
-      - run: pnpm build
+      - name: Fetch locked Rust build dependencies
+        run: cargo fetch --locked --manifest-path backend-rs/Cargo.toml
+      - name: Verify application and fixtures
+        env:
+          SIDELOADER_E2E_REPORT: e2e-result.json
+        run: |
+          set -o pipefail
+          pnpm test:all 2>&1 | tee e2e-result.log
+      - name: Preserve fixture integration log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sideloader-e2e-failure
+          path: |
+            e2e-result.log
+            e2e-result.json
+          if-no-files-found: ignore
       - name: Package plugin ZIP
         run: pnpm package-plugin
       - name: Validate release notes

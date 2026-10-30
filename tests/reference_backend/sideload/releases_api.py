@@ -14,6 +14,7 @@ from sideload.repo_probe import probe_repository
 from sideload.rpc import _observed_rpc
 from sideload.diagnostic_context import DiagnosticError, error_fields, identifier
 from sideload.zip_version import probe_release_zip
+from sideload.self_update import ACTIVE as SELF_UPDATE_ACTIVE, require_no_self_update
 
 
 GITHUB_API = "https://api.github.com/repos/{repo}/releases"
@@ -273,6 +274,7 @@ class ReleasesAPI:
         return await self._check_updates("manual")
 
     async def _check_updates(self, source: str) -> dict:
+        require_no_self_update(self)
         if not hasattr(self, "_check_lock"):
             self._check_lock = asyncio.Lock()
         async with self._check_lock:
@@ -301,12 +303,16 @@ class ReleasesAPI:
             # eligibility snapshot. The report remains an immutable history.
             current = await self.list_sideload_plugins()
             current["last_check"] = report
+            if hasattr(self, "_self_record"):
+                current["self_update"] = await self.check_self_update()
             return current
 
     async def _scheduled_check(self) -> None:
+        self_update = None
         try:
             listing = await self._check_updates("scheduled")
             report = listing["last_check"]
+            self_update = listing.get("self_update")
         except Exception as error:
             report = {"checkedAt": datetime.now(timezone.utc).isoformat(), "source": "scheduled", "items": [], "error": str(error) or type(error).__name__}
             settings = load_settings(_settings_path())
@@ -316,7 +322,8 @@ class ReleasesAPI:
         # Delivery failure must not rewrite a completed check as a failed check.
         settings = load_settings(_settings_path())
         try:
-            await decky.emit("scheduled_check_completed", {"report": report, "checkNotifications": settings["checkNotifications"]})
+            await decky.emit("scheduled_check_completed", {"report": report, "checkNotifications": settings["checkNotifications"],
+                                                         "self_update": self_update})
         except Exception:
             decky.logger.exception("scheduled check event delivery failed")
 
@@ -326,6 +333,8 @@ class ReleasesAPI:
             try:
                 settings = load_settings(_settings_path())
                 if not settings["autoCheck"]:
+                    continue
+                if getattr(self, "_self_preparing", False) or (getattr(self, "_self_record", {}).get("operation") or {}).get("stage") in SELF_UPDATE_ACTIVE:
                     continue
                 report = settings.get("lastCheck") or {}
                 last = report.get("fullCheckedAt", report.get("checkedAt"))

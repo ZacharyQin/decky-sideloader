@@ -13,6 +13,7 @@ import { confirmDeleteBackups } from "./loaderBridge";
 import { refreshOperation } from "./installController";
 import type { AppSettings, BackupCleanup, CheckReport } from "./types";
 import { RepositoryMapSettings } from "./RepositoryMapSettings";
+import { SelfUpdateSettings } from "./SelfUpdateSettings";
 
 let showHomeTaskNotice = false;
 let showHomeTaskNoticeRevision = 0;
@@ -114,6 +115,7 @@ export function SettingsTab({ onResults = () => {}, focusResults = false, report
   const scheduled = latestScheduledReport(settings?.lastScheduledCheck ?? fallback, scheduledReport);
   const openResults = () => { if (scheduled && !busy) onResults(scheduled); };
   return <div className="gss-form gss-settings"><Heading title={t("设置")} />
+    <SelfUpdateSettings disabled={busy} />
     <PanelSection title={t("更新")}>
     {settings && <>
       <PanelSectionRow><ToggleField bottomSeparator="none" label={t("定期检查更新")} description={t("按间隔检查并保存结果，安装由你确认")}

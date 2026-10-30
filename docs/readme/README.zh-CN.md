@@ -113,7 +113,7 @@ decky-sideloader 是 Steam Deck 的 Decky 插件。它将已安装插件与 GitH
 5. 阅读 Decky 的确认内容并选择打包好的 ZIP。
 6. 返回插件列表，打开 **Sideloader**。
 
-更新 Sideloader 本身时，用同样的 Decky 流程安装新版 ZIP。卸载本插件请使用 Decky 设置中的 **Plugins**。
+更新 Sideloader 本身请进入“设置 → Sideloader 更新”。卸载本插件请使用 Decky 设置中的 **Plugins**。
 
 <h2 id="try-it">首次使用</h2>
 
@@ -151,7 +151,7 @@ decky-sideloader 是 Steam Deck 的 Decky 插件。它将已安装插件与 GitH
 
 ### 备份内容与保存位置
 
-替换已有插件前，会备份其 Decky 标准 `settings/<folder>` 和 `data/<folder>` 目录。不包含自定义路径，也不自动恢复或回滚。
+替换其他已有插件前，会备份其 Decky 标准 `settings/<folder>` 和 `data/<folder>` 目录。不包含自定义路径，也不自动恢复或回滚。
 
 可以在任务页查看这次备份包含哪些数据，以及备份文件保存在哪里。通常位于：
 
@@ -188,6 +188,12 @@ decky-sideloader 是 Steam Deck 的 Decky 插件。它将已安装插件与 GitH
 在插件详情进入“维护此插件”，可以同版重装、卸载并重新安装、更改仓库关联或移除插件。日常更新直接使用详情中的版本操作。
 
 需要让商店插件使用 GitHub 版本时，进入“设置 → 商店插件”，明确接管目标插件；接管后暂停其原生商店更新检查。“交还商店”会恢复接管前的商店更新设置。
+
+### Sideloader 更新
+
+进入“设置 → Sideloader 更新 → 检查 Sideloader 更新”。首页和定时检查也会检查 Sideloader，定时检查沿用现有间隔和通知设置；只提供 `ZacharyQin/decky-sideloader` 的更高正式版本。打开设置只读取已保存结果，不自动联网。
+
+下载可用更新后，继续到 Decky 原生安装确认。准备阶段核对发布校验值、包身份与版本、前端构建；重载后，只有运行中的前后端及安装文件均匹配目标才自动完成。可以取消准备或已知的待确认请求，但不能中断 Loader 已开始的程序替换。重载及未知结果不自动重放安装。自更新保留原有标准 settings/data，不回灌旧数据，也不生成普通其他插件安装的数据备份。
 
 ### 仓库映射表
 
@@ -252,13 +258,15 @@ decky-sideloader 是 Steam Deck 的 Decky 插件。它将已安装插件与 GitH
 <details id="build">
 <summary>从源码构建</summary>
 
-需要 Node.js、pnpm、Bun 和 Python 3。在仓库根目录运行：
+在 x86-64 Linux 上构建，需要 Node.js、pnpm、Bun、Python 3.11+ 和 Rust/Cargo 工具链（Rust 1.85+）。默认目标为 `x86_64-unknown-linux-gnu`，CI 使用 Ubuntu 22.04。在仓库根目录运行：
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm test
+pnpm test:rust
 pnpm test:python
+pnpm test:reference
 pnpm build
 ```
 
@@ -268,9 +276,11 @@ pnpm build
 pnpm package-plugin
 ```
 
-ZIP 包含前端、Python 后端、许可证材料和六种语言的 README。不要把设备设置、日志或备份放进去。
+ZIP 包含前端、Rust 可执行程序、Python Decky 适配入口、依赖许可证全文和六种语言的 README。不要把设备设置、日志或备份放进去。
 
-产物为 `dist/decky-sideloader-<version>.zip`。后端源码位于 `backend/main.py` 与按功能划分的 `backend/sideload/`；打包时映射为 Loader 要求的 `main.py` 和 `py_modules/sideload/`，不要把源码目录结构直接复制到设备。
+产物为 `dist/decky-sideloader-<version>.zip`。业务逻辑位于 `backend-rs/`，`backend/main.py` 仅适配 Decky 生命周期、RPC 和事件；打包后分别放在 `bin/sideloader-core` 与 Loader 要求的 `main.py`，构建身份位于 `dist/backend.json`。`pnpm build` 先构建 Rust release 并收集锁定依赖的许可证，再构建前端；`pnpm test:python` 构建 debug 程序并测试真实子进程。`tests/reference_backend/` 中冻结的 Python 0.5.0 后端仅作迁移参照，不进入运行包。不要把源码目录结构直接复制到设备。
+
+Python 适配层通过版本化标准输入／输出协议监管一个 Rust 进程；Rust 拥有任务状态和持久化。子进程失败不自动重启，结果不明的原生请求不重放；自更新在新实例启动后共同核验运行中的 Rust 程序／构建、已加载前端和安装文件哈希。
 
 `.github/workflows/build.yml` 中的 GitHub workflow 对 Pull Request 和推送到 `main` 的代码执行检查、构建并上传安装 ZIP。推送与 `package.json` 版本一致的 `v<version>` 标签时，还会创建 GitHub Release，附上 ZIP，正文使用 `CHANGELOG.md` 对应版本完整的英语／中文章节。
 

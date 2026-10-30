@@ -113,7 +113,7 @@ Decky가 없다면 공식 [Decky Loader 설치 안내](https://github.com/SteamD
 5. Decky의 확인 내용을 읽고 패키징된 ZIP을 선택합니다.
 6. 플러그인 목록으로 돌아가 **Sideloader**를 엽니다.
 
-Sideloader 자체를 업데이트할 때도 같은 Decky 절차로 새 ZIP을 설치합니다. 제거하려면 Decky 설정의 **Plugins**를 사용하세요.
+Sideloader 자체 업데이트는 **설정 → Sideloader 업데이트**에서 진행합니다. 제거하려면 Decky 설정의 **Plugins**를 사용하세요.
 
 <h2 id="try-it">처음 사용하기</h2>
 
@@ -151,7 +151,7 @@ QAM에서 **Sideloader**를 열고 원하는 작업의 절차를 선택하세요
 
 ### 백업 대상과 저장 위치
 
-기존 플러그인을 교체하기 전에 Decky 표준 `settings/<folder>`와 `data/<folder>`를 백업합니다. 사용자 정의 경로는 포함되지 않으며 자동 복원이나 롤백은 없습니다.
+다른 설치된 플러그인을 교체하기 전에 Decky 표준 `settings/<folder>`와 `data/<folder>`를 백업합니다. 사용자 정의 경로는 포함되지 않으며 자동 복원이나 롤백은 없습니다.
 
 작업 화면에서 백업한 데이터와 실제 저장 위치를 확인할 수 있습니다. 일반적인 위치는 다음과 같습니다.
 
@@ -188,6 +188,12 @@ QAM에서 **Sideloader**를 열고 원하는 작업의 절차를 선택하세요
 상세의 **플러그인 유지 관리**에서 같은 버전 재설치, 제거 후 재설치, 저장소 연결 변경, 플러그인 제거를 할 수 있습니다. 일반 업데이트는 상세 화면의 버전 작업을 사용합니다.
 
 스토어 플러그인에 GitHub 릴리스를 사용하려면 **설정 → 스토어 플러그인**에서 관리를 명시적으로 인수합니다. 스토어 업데이트 확인이 중지되며 **스토어로 관리 반환**으로 이전 업데이트 설정을 복원합니다.
+
+### Sideloader 업데이트
+
+**설정 → Sideloader 업데이트 → Sideloader 업데이트 확인**을 엽니다. 홈 및 정기 확인에도 Sideloader가 포함되며 기존 간격과 알림 설정을 따릅니다. `ZacharyQin/decky-sideloader`의 더 높은 정식 버전만 제공됩니다. 설정을 열면 저장된 결과만 읽고 자동으로 네트워크에 연결하지 않습니다.
+
+업데이트를 다운로드한 뒤 Decky 기본 설치 확인으로 진행하세요. 준비 단계에서 체크섬, 패키지 식별 정보/버전과 프런트엔드 빌드를 확인합니다. 다시 로드한 후 실행 중인 백엔드, 프런트엔드와 설치 파일이 대상과 모두 일치해야 완료됩니다. 준비나 식별된 확인 대기 요청은 취소할 수 있지만 Loader가 시작한 교체는 중단할 수 없습니다. 다시 로드하거나 결과가 불명확해도 설치를 반복하지 않습니다. 표준 settings/data는 그대로 유지하며 이전 데이터를 복원하거나 다른 플러그인용 데이터 백업을 생성하지 않습니다.
 
 ### 저장소 매핑
 
@@ -252,13 +258,15 @@ QAM에서 **Sideloader**를 열고 원하는 작업의 절차를 선택하세요
 <details id="build">
 <summary>소스에서 빌드하기</summary>
 
-Node.js, pnpm, Bun, Python 3가 필요합니다. 저장소 루트에서 다음 명령을 실행하세요.
+x86-64 Linux에서 빌드하며 Node.js, pnpm, Bun, Python 3.11+, Rust/Cargo(Rust 1.85+)가 필요합니다. 기본 대상은 `x86_64-unknown-linux-gnu`이며 CI는 Ubuntu 22.04를 사용합니다. 저장소 루트에서 다음 명령을 실행하세요.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm test
+pnpm test:rust
 pnpm test:python
+pnpm test:reference
 pnpm build
 ```
 
@@ -268,9 +276,11 @@ pnpm build
 pnpm package-plugin
 ```
 
-ZIP에는 프런트엔드, Python 백엔드, 라이선스 고지와 6개 언어의 README가 포함됩니다. 기기 설정, 로그, 백업은 넣지 마세요.
+ZIP에는 프런트엔드, Rust 실행 파일, Decky용 Python 어댑터, 의존성 라이선스 전문과 6개 언어의 README가 포함됩니다. 기기 설정, 로그, 백업은 넣지 마세요.
 
-결과물은 `dist/decky-sideloader-<version>.zip`입니다. 백엔드 소스는 `backend/main.py`와 기능별 `backend/sideload/`에 있으며, 패키징할 때 Loader가 요구하는 `main.py`와 `py_modules/sideload/`로 배치됩니다. 소스 디렉터리 구조를 그대로 기기에 복사하지 마세요.
+결과물은 `dist/decky-sideloader-<version>.zip`입니다. 비즈니스 로직은 `backend-rs/`에 있으며 `backend/main.py`는 Decky 수명 주기, RPC와 이벤트만 연결합니다. 패키지는 이를 `bin/sideloader-core`와 Loader가 요구하는 `main.py`에 배치하고 `dist/backend.json`에 빌드 식별 정보를 담습니다. `pnpm build`는 먼저 Rust release와 고정된 의존성의 라이선스를 생성하며, `pnpm test:python`은 debug 실행 파일로 실제 자식 프로세스를 테스트합니다. `tests/reference_backend/`의 동결된 Python 0.5.0 백엔드는 마이그레이션 검증용이며 실행 패키지에 포함되지 않습니다. 소스 디렉터리 구조를 그대로 기기에 복사하지 마세요.
+
+Python 어댑터는 버전이 명시된 표준 입출력 IPC로 Rust 프로세스 하나를 감독합니다. 작업 상태와 영속화는 Rust가 소유합니다. 실패한 프로세스를 자동 재시작하거나 결과가 불명확한 네이티브 요청을 재실행하지 않습니다. 자체 업데이트는 새 인스턴스가 시작된 뒤 실행 중인 Rust 바이너리/빌드, 로드된 프런트엔드와 설치 파일 해시를 함께 확인합니다.
 
 `.github/workflows/build.yml`의 GitHub workflow는 Pull Request와 `main`으로의 푸시를 검사하고 빌드한 뒤 설치 ZIP을 아티팩트로 업로드합니다. `package.json` 버전과 일치하는 `v<version>` 태그를 푸시하면 ZIP과 `CHANGELOG.md`의 해당 버전 영어·중국어 전체 내용을 포함한 GitHub Release도 게시합니다.
 

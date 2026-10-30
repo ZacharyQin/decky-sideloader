@@ -26,6 +26,9 @@ __pycache__/
 yalc.lock
 .vscode/settings.json
 backend/out
+/backend-rs/target/
+/bin/
+/py_modules/
 decky_plugin.py
 out
 out/*
@@ -35,3 +38,9 @@ cli/decky
 
 HANDOFF.md
 runs/
+
+# Generated test output; keep test sources and fixtures versioned.
+!tests/fixtures/rust-std/*.gz
+/e2e-result.json
+/test-results/
+/.test-results/

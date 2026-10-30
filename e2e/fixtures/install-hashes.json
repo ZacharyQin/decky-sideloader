@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "packages": {
+    "new": {
+      "archive": "d7eb8a34dfd04791a98b1875661c577d139894d4c655bc218c6cea921ff3509b",
+      "files": {
+        "plugin.json": "7a6e40b3f2f17032b97a949069e7199fa4a23383844cb20e4f4c62409d59e6b4",
+        "package.json": "f13b3c3f000173e3340498007b4c5b0aaab768364251da9a0729bebcb2d60d37",
+        "main.py": "d6adc8a160fcb5e93c2e2dc71338f62e0f1732acd23fb0b721ae739cce1c0600",
+        "dist/index.js": "67f9cd9367f356d4b9aac6d4dcc611a3c93c75f7df410722cdd1774066f7b5a1",
+        "bin/dependency-a": "e8dd1100edb6955ddf5a9bf11ba2320dbc77a0f910fbe13e03cec653f913073f",
+        "bin/dependency-b": "05b09a2a5019f252ef5b75e704384a7ddad40d0ac94eb12a27993da49b44acd1"
+      }
+    },
+    "overwrite": {
+      "archive": "e3928f8b435e8cc469c0fcaf705c9bc4cedc840e8b25105ad14e64b0a88fdbb3",
+      "files": {
+        "plugin.json": "2f98b60750d8f1243f8de7ac3e60c108859980d279affb519038d8b9fe2e1c8a",
+        "package.json": "dad896421fb5b1613d51179463bb219521501adb992836297f3dceca3f69d8dc",
+        "main.py": "a37089cfa86d1c84a5b53c9d21c31f3ff19ecdff9214d63faf043fbdd1640539",
+        "dist/index.js": "67f9cd9367f356d4b9aac6d4dcc611a3c93c75f7df410722cdd1774066f7b5a1",
+        "bin/dependency-a": "e8dd1100edb6955ddf5a9bf11ba2320dbc77a0f910fbe13e03cec653f913073f",
+        "bin/dependency-b": "05b09a2a5019f252ef5b75e704384a7ddad40d0ac94eb12a27993da49b44acd1"
+      }
+    }
+  },
+  "protected": {
+    "settings/example/preferences.json": "7265b43da4280bcff433aba89250198cbb86ef4e84a82a9a301404ebea4f5a75",
+    "data/example/notes.bin": "73d9df8ed156aa16bdc6eb28f91b2c8448997be110b673fdc0f4f6c2997fd3a3"
+  }
+}

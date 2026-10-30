@@ -113,7 +113,7 @@ The following are the English labels in Decky's interface:
 5. Read Decky's confirmation and select the packaged ZIP.
 6. Return to the plugin list and open **Sideloader**.
 
-To update Sideloader itself, install a newer packaged ZIP through the same Decky flow. To remove it, use **Plugins** in Decky's settings.
+To update Sideloader itself, open **Settings → Sideloader updates**. To remove it, use **Plugins** in Decky's settings.
 
 <h2 id="try-it">First use</h2>
 
@@ -151,7 +151,7 @@ Use **A** to activate an item and **B** to return. Search drafts, version choice
 
 ### What is backed up and where
 
-Before replacing an existing plugin, decky-sideloader backs up its standard Decky `settings/<folder>` and `data/<folder>` directories. Custom paths are not included, and there is no automatic restore or rollback.
+Before replacing another installed plugin, decky-sideloader backs up its standard Decky `settings/<folder>` and `data/<folder>` directories. Custom paths are not included, and there is no automatic restore or rollback.
 
 The task page shows which data was backed up and where the backup is saved. The usual location is:
 
@@ -188,6 +188,12 @@ Details keep the last successfully loaded release list until you reload it or ch
 Open **Plugin maintenance** in a plugin's details to reinstall the same version, uninstall and reinstall, change its repository link, or remove it. Routine updates use the version actions in details.
 
 To use a GitHub release for a store-managed plugin, open **Settings → Store plugins** and explicitly take over the plugin. This pauses its native store update checks. **Return to store** restores its previous store-update setting.
+
+### Sideloader updates
+
+Open **Settings → Sideloader updates → Check for Sideloader updates**. Home and scheduled checks also check Sideloader; scheduled checks follow the existing interval and notification settings. Only newer stable releases from `ZacharyQin/decky-sideloader` are offered. Opening Settings reads the saved result without a network request.
+
+Download an available update, then continue to Decky's native installation confirmation. Preparation checks the release checksum, package identity/version and frontend build. A reloaded instance completes the update only after the running backend, frontend and installed files match. Cancellation stops preparation or a known pending confirmation, not a replacement already started by Loader. Reloads and uncertain results never replay installation. Self-update keeps standard settings/data in place and does not restore old data or create the ordinary other-plugin data backup.
 
 ### Repository map
 
@@ -252,13 +258,15 @@ This README is available in the same six languages through the links at the top.
 <details id="build">
 <summary>Build from source</summary>
 
-Node.js, pnpm, Bun and Python 3 are required. Run these commands from the repository root:
+Build on x86-64 Linux with Node.js, pnpm, Bun, Python 3.11+ and the Rust/Cargo toolchain (Rust 1.85+). The default target is `x86_64-unknown-linux-gnu`; CI uses Ubuntu 22.04. Run these commands from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm test
+pnpm test:rust
 pnpm test:python
+pnpm test:reference
 pnpm build
 ```
 
@@ -268,9 +276,11 @@ Create the installation ZIP after building:
 pnpm package-plugin
 ```
 
-The ZIP includes the frontend, Python backend, license notices and all six READMEs. Do not add device settings, logs or backups to it.
+The ZIP includes the frontend, Rust executable, Python Decky adapter, dependency license texts and all six READMEs. Do not add device settings, logs or backups to it.
 
-The output is `dist/decky-sideloader-<version>.zip`. Backend source lives in `backend/main.py` and the feature modules under `backend/sideload/`; packaging maps them to the Loader-required `main.py` and `py_modules/sideload/` paths. Do not copy the source layout directly to the device.
+The output is `dist/decky-sideloader-<version>.zip`. Business logic lives in `backend-rs/`; `backend/main.py` only adapts Decky's lifecycle, RPCs and events. The package places them at `bin/sideloader-core` and Loader's required `main.py`, with verified build identity at `dist/backend.json`. `pnpm build` builds the Rust release before the frontend and collects locked crate licenses; `pnpm test:python` builds the debug executable for real subprocess tests. The frozen Python 0.5.0 backend under `tests/reference_backend/` is a migration oracle and is excluded from runtime packages. Do not copy the source layout directly to the device.
+
+The Python adapter supervises one Rust process over versioned stdio IPC. Rust owns task state and persistence; a failed child is not automatically restarted and uncertain native requests are never replayed. Self-update verifies the running Rust binary/build, loaded frontend and installed file hashes after a new instance starts.
 
 The GitHub workflow in `.github/workflows/build.yml` validates and builds pull requests and pushes to `main`, then uploads the installation ZIP as an artifact. Pushing a `v<version>` tag matching `package.json` also publishes a GitHub Release with that ZIP and the complete matching English/Chinese section from `CHANGELOG.md`.
 

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -34,10 +35,11 @@ function packageEntry(directory, group, host = false) {
     .replace(/^git\+/, "").replace(/^git:\/\//, "https://").replace(/^ssh:\/\/git@([^/:]+)[:/]/, "https://$1/").replace(/\.git$/, "");
   const source = /^(?:github:)?[\w.-]+\/[\w.-]+(?:#.*)?$/.test(repositoryUrl)
     ? `https://github.com/${repositoryUrl.replace(/^github:/, "")}` : repositoryUrl;
-  const author = (typeof pkg.author === "string" ? pkg.author : pkg.author?.name) || "";
   const copyright = [...new Set(documents.flatMap(doc => doc.text.split("\n")
-    .filter(line => /^\s*Copyright\s+(?:\(c\)\s*)?(?:\d{4}|©)/i.test(line)).map(line => line.trim())))].join("\n");
-  const attribution = pkg.license.startsWith("LGPL") ? author || copyright : copyright || author;
+    .filter(line => /^\s*Copyright\s+(?:\(c\)\s*)?(?:\d{4}|©)/i.test(line))
+    .filter(line => !/copyright\s*\(c\)\s*1991,\s*1999\s+free software foundation, inc\./i.test(line))
+    .map(line => line.trim())))].join("\n");
+  const attribution = copyright;
   return { id: pkg.name, name: pkg.name, version: pkg.version, group, host, license: pkg.license, source, attribution, documents };
 }
 
@@ -55,7 +57,7 @@ export default function licenseNotices() {
       }
       const own = metadata(root);
       const entries = [{ id: "project", name: "Sideloader", version: own.version, group: "project", host: false,
-        license: "BSD-3-Clause", source: "https://github.com/SteamDeckHomebrew/decky-plugin-template",
+        license: "BSD-3-Clause", source: "https://github.com/ZacharyQin/decky-sideloader",
         attribution: "Copyright (c) 2026, zacharym\nOriginal Copyright (c) 2022-2024, Steam Deck Homebrew",
         documents: [document("LICENSE", read(join(root, "LICENSE")))] }];
       for (const [name, directory] of [...roots].sort(([a], [b]) => a.localeCompare(b))) {
@@ -68,7 +70,6 @@ export default function licenseNotices() {
         }
         entries.push(entry);
       }
-      entries.push(packageEntry(resolve(root, "node_modules/@decky/ui"), "decky", true));
       if (modules.some(id => id.includes("/react-icons/fa/"))) entries.push({
         id: "font-awesome-5", name: "Font Awesome Free 5", version: "5.15.4-3-gafecf2a", group: "icons", host: false,
         license: "CC-BY-4.0", source: "https://github.com/FortAwesome/Font-Awesome/tree/afecf2a", attribution: "Fonticons, Inc.",
@@ -95,7 +96,20 @@ export default function licenseNotices() {
         const helper = packageEntry(packageRoot(rollupRequire.resolve("@rollup/plugin-commonjs")), "embedded");
         entries.push({ ...helper, name: "CommonJS helper" });
       }
-      this.emitFile({ type: "asset", fileName: "notices.json", source: JSON.stringify({ entries }, null, 2) + "\n" });
+      const rustPath = join(root, "bin/rust-notices.json");
+      this.addWatchFile(rustPath);
+      const rust = JSON.parse(read(rustPath));
+      if (!Array.isArray(rust.entries) || !rust.entries.length) throw new Error("Rust backend license materials are missing");
+      if (!rust.standardLibrary || rust.standardLibrary.id !== "rust-standard-library" || !Array.isArray(rust.standardLibrary.documents) || rust.standardLibrary.documents.length < 4) throw new Error("Rust standard-library notices are missing");
+      entries.push(...rust.entries, rust.standardLibrary);
+      const texts = {};
+      const packed = entries.map(entry => ({ ...entry, documents: entry.documents.map(doc => {
+        const ref = createHash("sha256").update(doc.text, "utf8").digest("hex");
+        if (texts[ref] !== undefined && texts[ref] !== doc.text) throw new Error("License text hash collision");
+        texts[ref] = doc.text;
+        return { title: doc.title, ref };
+      }) }));
+      this.emitFile({ type: "asset", fileName: "notices.json", source: JSON.stringify({ entries: packed, texts }, null, 2) + "\n" });
     },
   };
 }

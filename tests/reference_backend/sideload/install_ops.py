@@ -98,7 +98,7 @@ def download_asset(url: str, target: Path, context, *, transport=None, progress=
                     raise network_error(error) from error
 
 
-def inspect_archive(path: Path, existing: dict | None, installed: list[dict], self_name: str, self_folder: str, target: dict | None = None) -> dict:
+def inspect_archive(path: Path, existing: dict | None, installed: list[dict], self_name: str, self_folder: str, target: dict | None = None, *, updating_self: bool = False) -> dict:
     with ZipFile(path) as archive:
         entries = archive.infolist()
         if not entries or len(entries) > MAX_ENTRIES or sum(e.file_size for e in entries) > MAX_EXPANDED:
@@ -156,7 +156,10 @@ def inspect_archive(path: Path, existing: dict | None, installed: list[dict], se
             warnings.append("安装包未附带 LICENSE，请自行核对作者的分发许可。")
         if "root" in (plugin.get("flags") or []):
             warnings.append("此插件声明了 root 权限，请仅安装可信作者的发布。")
-        if name == self_name or folder == self_folder:
+        if updating_self:
+            if (name, folder, package.get("name")) != (self_name, self_folder, "decky-sideloader") or not existing:
+                raise RuntimeError("自更新安装包身份不一致")
+        elif name == self_name or folder == self_folder:
             raise RuntimeError("不能通过本插件替换 Sideloader 自身")
         collision = next((p for p in installed if p["name"] == name or p["folder"] == folder), None)
         if existing:

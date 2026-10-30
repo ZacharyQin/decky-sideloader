@@ -2,8 +2,20 @@ import { t } from "./i18n";
 import { mergeLoaderPlugins } from "./loaderManagement";
 import { callable } from "@decky/api";
 import type { AppSettings, InstallOperation, PluginListResponse, ReleaseRow, ReleaseReadResult, RepositoryRow, RepositoryProbe, NetworkMode, DiagnosticEvent, DiagnosticStatus, DiagnosticShare, OwnershipIntent } from "./types";
-import type { BackupCleanup, LicenseEntry, RepositoryMapStatus, RepositoryMapUpdate } from "./types";
+import type { BackupCleanup, RepositoryMapStatus, RepositoryMapUpdate } from "./types";
+import { decodeLicenseNotices } from "./licenseNotices";
 import { cleanDiagnosticEvent } from "./diagnosticEvents";
+import { frontendIdentity } from "./build";
+import type { SelfUpdateStatus, FrontendIdentity } from "./types";
+
+const readSelfUpdate = callable<[frontend: FrontendIdentity | null], SelfUpdateStatus>("get_self_update_status");
+export const getSelfUpdateStatus = () => readSelfUpdate(frontendIdentity);
+export const checkSelfUpdate = callable<[], SelfUpdateStatus>("check_self_update");
+export const prepareSelfUpdate = callable<[tag: string, sha256: string], SelfUpdateStatus>("prepare_self_update");
+const submitSelf = callable<[identifier: string, frontend: FrontendIdentity | null], SelfUpdateStatus>("submit_self_update");
+export const submitSelfUpdate = (identifier: string) => submitSelf(identifier, frontendIdentity);
+export const cancelSelfUpdate = callable<[identifier: string], SelfUpdateStatus>("cancel_self_update");
+export const recordSelfUpdateEvent = callable<[identifier: string, kind: string, value?: string, evidence?: string], SelfUpdateStatus>("record_self_update_event");
 
 const readDiskPlugins = callable<[refresh?: boolean], PluginListResponse>("list_sideload_plugins");
 const checkDiskUpdates = callable<[], PluginListResponse>("check_updates");
@@ -15,7 +27,8 @@ export const listSideloadPlugins = (refresh = false) => withLoader(() => refresh
 export const getAppSettings = callable<[], AppSettings>("get_app_settings");
 export const getRepositoryMapStatus = callable<[], RepositoryMapStatus>("get_repository_map_status");
 export const updateRepositoryMap = callable<[], RepositoryMapUpdate>("update_repository_map");
-export const getOpenSourceNotices = callable<[], { entries: LicenseEntry[] }>("get_open_source_notices");
+const readOpenSourceNotices = callable<[], unknown>("get_open_source_notices");
+export const getOpenSourceNotices = async () => decodeLicenseNotices(await readOpenSourceNotices());
 export const setNetworkMode = callable<[mode: NetworkMode], AppSettings>("set_network_mode");
 export const setCheckNotifications = callable<[enabled: boolean], AppSettings>("set_check_notifications");
 export const setShowHomeTaskNotice = callable<[enabled: boolean], AppSettings>("set_show_home_task_notice");

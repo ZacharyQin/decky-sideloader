@@ -4,6 +4,7 @@ import { createElement, useEffect, useState } from "react";
 import type { ConfirmModalProps } from "@decky/ui";
 import { validateLoaderPlugins, type LoaderSnapshot } from "./loaderManagement";
 import type { InstallOperation } from "./types";
+import type { SelfUpdateOperation } from "./types";
 import { errorText } from "./errors";
 
 export enum InstallType { INSTALL = 0, REINSTALL = 1, UPDATE = 2, DOWNGRADE = 3, OVERWRITE = 4 }
@@ -43,6 +44,18 @@ export async function installFromArtifact(operation: InstallOperation, installTy
   return host().DeckyBackend!.call("utilities/install_plugin", operation.artifact, pkg.name, pkg.version, pkg.sha256, installType);
 }
 
+export async function installSelfUpdate(operation: SelfUpdateOperation): Promise<unknown> {
+  const probe = probeLoaderChannel();
+  if (!probe.ok) throw new Error(probe.reason);
+  const pkg = operation.package;
+  if (operation.stage !== "awaiting" || !pkg || pkg.name !== SELF_NAME || pkg.folder !== "decky-sideloader" ||
+    pkg.version !== operation.release.version || pkg.sha256 !== operation.release.sha256 || !/^[a-f0-9]{64}$/.test(pkg.sha256) ||
+    !operation.artifact.startsWith("file:///") || !operation.artifact.endsWith(`/self-update/${operation.id}/plugin.zip`)) {
+    throw new Error(t("安装任务未通过本地预检，拒绝提交"));
+  }
+  return host().DeckyBackend!.call("utilities/install_plugin", operation.artifact, SELF_NAME, pkg.version, pkg.sha256, InstallType.UPDATE);
+}
+
 export function listenForInstallEvents(onEvent: (kind: string, name: string, value: string, sha256: string) => void): () => void {
   const backend = host().DeckyBackend;
   if (!backend?.addEventListener || !backend.removeEventListener) return () => {};
@@ -52,15 +65,16 @@ export function listenForInstallEvents(onEvent: (kind: string, name: string, val
   const originalCall = backend.call;
   const observedCall: DeckyBackend["call"] = async function (route, ...args) {
     const requestId = String(args[0] ?? "");
-    const name = route === "utilities/confirm_plugin_install" ? prompts.get(requestId) : undefined;
+    const cancelling = route === "utilities/cancel_plugin_install";
+    const name = route === "utilities/confirm_plugin_install" || cancelling ? prompts.get(requestId) : undefined;
     try {
       const result = await originalCall.call(backend, route, ...args);
-      if (!disposed && name) onEvent("confirm_returned", name, "", requestId);
+      if (!disposed && name) onEvent(cancelling ? "cancelled" : "confirm_returned", name, "", requestId);
       if (!disposed && route === "utilities/uninstall_plugin") onEvent("uninstall_returned", requestId, "", "");
       return result;
     } catch (error) {
       if (!disposed && name) {
-        onEvent("install_error", name, errorText(error), requestId);
+        onEvent(cancelling ? "cancel_unknown" : "install_error", name, errorText(error), requestId);
       }
       throw error;
     } finally {

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "packages": {
+    "0.5.0": {"name":"Example","folder":"example","version":"0.5.0","repo":"fixture/example","files":{"plugin.json":"{\"name\":\"Example\",\"author\":\"Fixture\",\"flags\":[]}\n","package.json":"{\"name\":\"example\",\"version\":\"0.5.0\",\"repository\":\"fixture/example\",\"devDependencies\":{\"@decky/api\":\"1\"}}\n","main.py":"# fixed workflow example 0.5.0\n","dist/index.js":"export const fixtureVersion = '0.5.0';\n","LICENSE":"BSD-3-Clause\n"}},
+    "1.0.0": {"name":"Example","folder":"example","version":"1.0.0","repo":"fixture/example","files":{"plugin.json":"{\"name\":\"Example\",\"author\":\"Fixture\",\"flags\":[]}\n","package.json":"{\"name\":\"example\",\"version\":\"1.0.0\",\"repository\":\"fixture/example\",\"devDependencies\":{\"@decky/api\":\"1\"}}\n","main.py":"# fixed workflow example 1.0.0\n","dist/index.js":"export const fixtureVersion = '1.0.0';\n","LICENSE":"BSD-3-Clause\n"}},
+    "2.0.0": {"name":"Example","folder":"example","version":"2.0.0","repo":"fixture/example","files":{"plugin.json":"{\"name\":\"Example\",\"author\":\"Fixture\",\"flags\":[]}\n","package.json":"{\"name\":\"example\",\"version\":\"2.0.0\",\"repository\":\"fixture/example\",\"devDependencies\":{\"@decky/api\":\"1\"}}\n","main.py":"# fixed workflow example 2.0.0\n","dist/index.js":"export const fixtureVersion = '2.0.0';\n","LICENSE":"BSD-3-Clause\n"}}
+  },
+  "cases": [
+    {"id":"workflow_update","action":"versions","targets":["2.0.0"],"native_types":[2],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0},
+    {"id":"workflow_crash_backup","action":"crash_backup","targets":["2.0.0"],"native_types":[4],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0,"backup_gate":true},
+    {"id":"workflow_crash_download","action":"crash_download","targets":["2.0.0"],"native_types":[4],"releases":3,"probes":{"2.0.0":3},"downloads":{"2.0.0":2},"uninstalls":0,"crash_download":true},
+    {"id":"workflow_crash_ready","action":"crash_ready","targets":["2.0.0"],"native_types":[],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0},
+    {"id":"workflow_crash_awaiting","action":"crash_awaiting","targets":["2.0.0"],"native_types":[2],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0},
+    {"id":"workflow_crash_uninstall","action":"crash_uninstall","targets":["2.0.0"],"native_types":[],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":1,"hold_uninstall":true},
+    {"id":"workflow_crash_installing","action":"crash_installing","targets":["2.0.0"],"native_types":[2],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0,"native_mode":"hold_after_start"},
+    {"id":"workflow_crash_verified","action":"crash_verified","targets":["2.0.0"],"native_types":[2],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0,"phase_gate":"install-verified"},
+    {"id":"workflow_same","action":"versions","targets":["1.0.0"],"native_types":[1],"releases":2,"probes":{"2.0.0":1,"1.0.0":1},"downloads":{"1.0.0":1},"uninstalls":0},
+    {"id":"workflow_downgrade","action":"versions","targets":["0.5.0"],"native_types":[3],"releases":2,"probes":{"2.0.0":1,"0.5.0":1},"downloads":{"0.5.0":1},"uninstalls":0},
+    {"id":"workflow_roundtrip","action":"versions","targets":["2.0.0","1.0.0","2.0.0"],"native_types":[2,3,2],"releases":6,"probes":{"2.0.0":5,"1.0.0":1},"downloads":{"2.0.0":2,"1.0.0":1},"uninstalls":0},
+    {"id":"workflow_reinstall","action":"reinstall","targets":["2.0.0"],"native_types":[0],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":1},
+    {"id":"workflow_reinstall_cancel","action":"reinstall_cancel","targets":["2.0.0"],"native_types":[],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0},
+    {"id":"workflow_uninstall","action":"uninstall","targets":[],"native_types":[],"releases":1,"probes":{"2.0.0":1},"downloads":{},"uninstalls":1},
+    {"id":"workflow_uninstall_cancel","action":"uninstall_cancel","targets":[],"native_types":[],"releases":1,"probes":{"2.0.0":1},"downloads":{},"uninstalls":0},
+    {"id":"workflow_uninstall_install","action":"uninstall_install","targets":["2.0.0"],"native_types":[0],"releases":3,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":1,"repo_probe":true},
+    {"id":"workflow_retry","action":"retry","targets":["2.0.0"],"native_types":[2],"releases":3,"probes":{"2.0.0":3},"downloads":{"2.0.0":2},"uninstalls":0},
+    {"id":"workflow_continue","action":"continue","targets":["2.0.0"],"native_types":[2],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0},
+    {"id":"workflow_gh_proxy","action":"versions","targets":["2.0.0"],"native_types":[2],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0,"network":"gh-proxy"},
+    {"id":"workflow_ghfast","action":"versions","targets":["2.0.0"],"native_types":[2],"releases":2,"probes":{"2.0.0":2},"downloads":{"2.0.0":1},"uninstalls":0,"network":"ghfast"},
+    {"id":"workflow_ownership_return","action":"ownership","ownership":"return","store":true,"targets":["2.0.0"],"native_types":[2],"releases":3,"probes":{"2.0.0":3},"downloads":{"2.0.0":1},"uninstalls":0},
+    {"id":"workflow_ownership_prior_frozen","action":"ownership","ownership":"return","store":true,"prior_frozen":true,"targets":["2.0.0"],"native_types":[2],"releases":3,"probes":{"2.0.0":3},"downloads":{"2.0.0":1},"uninstalls":0},
+    {"id":"workflow_ownership_write_failure","action":"ownership","ownership":"write_failure","store":true,"targets":[],"native_types":[],"releases":1,"probes":{"2.0.0":1},"downloads":{},"uninstalls":0},
+    {"id":"workflow_ownership_cross_instance","action":"ownership","ownership":"cross_instance","store":true,"targets":[],"native_types":[],"releases":1,"probes":{"2.0.0":1},"downloads":{},"uninstalls":0},
+    {"id":"workflow_ownership_identity","action":"ownership","ownership":"identity","store":true,"targets":[],"native_types":[],"releases":1,"probes":{"2.0.0":1},"downloads":{},"uninstalls":0},
+    {"id":"workflow_binding_map","action":"binding_map","targets":[],"native_types":[],"releases":1,"probes":{"2.0.0":1},"downloads":{},"uninstalls":0,"map":true}
+  ]
+}

@@ -33,6 +33,9 @@ export default function buildIdentity() {
       const chunk = Object.values(bundle).find(item => item.type === "chunk" && item.isEntry);
       if (!chunk) throw new Error("Frontend entry bundle missing");
       this.emitFile({ type: "asset", fileName: "build.json", source: JSON.stringify({ ...identity, bundle: digest(chunk.code) }) + "\n" });
+      const backend = join(root, "bin/backend.json");
+      this.addWatchFile(backend);
+      this.emitFile({ type: "asset", fileName: "backend.json", source: readFileSync(backend, "utf8") });
     },
   };
 }
