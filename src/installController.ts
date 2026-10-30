@@ -25,9 +25,13 @@ let cancellingId: string | null = null;
 const blocked = new Set<string>();
 const cancelUncertain = new Set<string>();
 const nativeStarted = new Set<string>();
-const publish = (operation: InstallOperation | null, error: string | null = null) => {
+const publish = (operation: InstallOperation | null, error: string | null = null, explicitPreparation = false) => {
   if (operation && snapshot.operation?.id === operation.id) {
-    if (!isActive(snapshot.operation) && isActive(operation)) operation = snapshot.operation;
+    const restarting = explicitPreparation && snapshot.operation.stage === "failed"
+      && !snapshot.operation.cancel_requested && !snapshot.operation.request_id && !snapshot.operation.saw_start
+      && ["checking", "backup", "ready"].includes(operation.stage)
+      && !operation.cancel_requested && !operation.request_id && !operation.saw_start;
+    if (!restarting && !isActive(snapshot.operation) && isActive(operation)) operation = snapshot.operation;
     else {
       if (snapshot.operation.cancel_requested) operation = { ...operation, cancel_requested: true };
       if (snapshot.operation.notice_dismissed) operation = { ...operation, notice_dismissed: true };
@@ -244,7 +248,7 @@ export async function continueDownloaded(identifier: string): Promise<void> {
   const currentGeneration = generation;
   try {
     const result = await continuePrepared(identifier);
-    if (currentGeneration === generation && result.id === identifier) publish(result);
+    if (currentGeneration === generation && snapshot.operation?.id === identifier && snapshot.operation.stage === "failed" && result.id === identifier) publish(result, null, true);
   } catch (error) {
     if (currentGeneration === generation && snapshot.operation?.id === identifier) publish(snapshot.operation, errorText(error));
   }
@@ -256,7 +260,7 @@ export async function retryFailedDownload(identifier: string): Promise<void> {
   const currentGeneration = generation;
   try {
     const result = await retryDownload(identifier);
-    if (currentGeneration === generation && result.id === identifier) publish(result);
+    if (currentGeneration === generation && snapshot.operation?.id === identifier && snapshot.operation.stage === "failed" && result.id === identifier) publish(result, null, true);
   } catch (error) {
     if (currentGeneration === generation && snapshot.operation?.id === identifier) publish(snapshot.operation, errorText(error));
   }

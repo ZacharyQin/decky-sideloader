@@ -1,0 +1,6 @@
+{
+  "schema":1,
+  "version":"0.6.0",
+  "private_note":"PRIVATE_DIAGNOSTIC_FIXTURE_SENTINEL",
+  "cases":[{"id":"diagnostics_ui"}]
+}

@@ -258,13 +258,15 @@ This README is available in the same six languages through the links at the top.
 <details id="build">
 <summary>Build from source</summary>
 
-Node.js, pnpm, Bun and Python 3 are required. Run these commands from the repository root:
+Build on x86-64 Linux with Node.js, pnpm, Bun, Python 3.11+ and the Rust/Cargo toolchain (Rust 1.85+). The default target is `x86_64-unknown-linux-gnu`; CI uses Ubuntu 22.04. Run these commands from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm test
+pnpm test:rust
 pnpm test:python
+pnpm test:reference
 pnpm build
 ```
 
@@ -274,9 +276,11 @@ Create the installation ZIP after building:
 pnpm package-plugin
 ```
 
-The ZIP includes the frontend, Python backend, license notices and all six READMEs. Do not add device settings, logs or backups to it.
+The ZIP includes the frontend, Rust executable, Python Decky adapter, dependency license texts and all six READMEs. Do not add device settings, logs or backups to it.
 
-The output is `dist/decky-sideloader-<version>.zip`. Backend source lives in `backend/main.py` and the feature modules under `backend/sideload/`; packaging maps them to the Loader-required `main.py` and `py_modules/sideload/` paths. Do not copy the source layout directly to the device.
+The output is `dist/decky-sideloader-<version>.zip`. Business logic lives in `backend-rs/`; `backend/main.py` only adapts Decky's lifecycle, RPCs and events. The package places them at `bin/sideloader-core` and Loader's required `main.py`, with verified build identity at `dist/backend.json`. `pnpm build` builds the Rust release before the frontend and collects locked crate licenses; `pnpm test:python` builds the debug executable for real subprocess tests. The frozen Python 0.5.0 backend under `tests/reference_backend/` is a migration oracle and is excluded from runtime packages. Do not copy the source layout directly to the device.
+
+The Python adapter supervises one Rust process over versioned stdio IPC. Rust owns task state and persistence; a failed child is not automatically restarted and uncertain native requests are never replayed. Self-update verifies the running Rust binary/build, loaded frontend and installed file hashes after a new instance starts.
 
 The GitHub workflow in `.github/workflows/build.yml` validates and builds pull requests and pushes to `main`, then uploads the installation ZIP as an artifact. Pushing a `v<version>` tag matching `package.json` also publishes a GitHub Release with that ZIP and the complete matching English/Chinese section from `CHANGELOG.md`.
 

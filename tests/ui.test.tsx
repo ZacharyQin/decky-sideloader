@@ -76,7 +76,9 @@ const api = {
   cancelSelfUpdate: mock(async (): Promise<SelfUpdateStatus> => selfStatus),
   recordSelfUpdateEvent: mock(async (): Promise<SelfUpdateStatus> => selfStatus),
   getOpenSourceNotices: mock(async () => ({ entries: [{ id: "sample", name: "Sample", version: "1.0", group: "transitive", host: false,
-    license: "MIT", source: "https://example.com", attribution: "Example", documents: [{ title: "LICENSE", text: "Copyright Example\n\nPermission granted.\n" }] }] })),
+    license: "MIT", source: "https://example.com", attribution: "Example", documents: [{ title: "LICENSE", text: "Copyright Example\n\nPermission granted.\n" }] },
+    { id: "rust:sample:1", name: "Rust Sample", version: "1.0", group: "rust", host: false,
+      license: "MIT", source: "https://example.com", attribution: "", documents: [{ title: "LICENSE", text: "MIT" }] }] })),
   setBinding: mock(async () => ({ name: "Example", repo: "acme/example" })), clearBinding: mock(async () => undefined),
   getOperation: mock(async () => operation), prepareInstall: mock(async () => operation!),
   claimUninstall: mock(async () => (operation = { ...operation!, stage: "uninstalling" })),
@@ -2990,6 +2992,7 @@ test("license reader retains expanded group and document selection across QAM wi
   const back = async () => act(async () => navigation(root).props.onCancel({ preventDefault() {}, stopPropagation() {} }));
   await click("settings"); await click("licenses");
   expect(buttons(root).some(button => button.props["data-action-key"] === "license-entry-sample")).toBe(false);
+  expect(buttons(root).some(button => button.props["data-action-key"] === "license-entry-rust:sample:1")).toBe(true);
   await click("license-dependencies"); await click("license-entry-sample"); await click("license-document-0");
   await unmount(root); root = await mount(definition.content as React.ReactElement);
   expect(root.root.findAllByType("Field").filter(field => field.props.className === "gss-license-paragraph").map(field => field.props.label).join("")).toBe("Copyright Example\n\nPermission granted.\n");

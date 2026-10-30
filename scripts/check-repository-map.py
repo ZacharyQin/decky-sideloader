@@ -2,11 +2,10 @@
 import argparse
 from pathlib import Path
 import subprocess
-import sys
+
+from map_data import decode_mapping, read_mapping
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
-from sideload.repository_map import decode_mapping, read_mapping
 
 
 def main():

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "packages": {
+    "0.5.0": {
+      "archive": "2aa289ed5b7ab3d091294ad2cdee851ecf9aeb81001c5e09794fad1b555a95be",
+      "files": {
+        "plugin.json": "2f98b60750d8f1243f8de7ac3e60c108859980d279affb519038d8b9fe2e1c8a",
+        "package.json": "709a477d003b0d87c9eb0701aeb39eb6e3f47ab392f442f9915b997de3da27c3",
+        "main.py": "7f17c3fa90079781666b336e69fa56de1590da7537e2cfe48dc1c3e1d6546fa9",
+        "dist/index.js": "ca2e279d4750cc96f2d669b75cbf0e75232a4cd2b9308ee292747685cbbb7d32",
+        "LICENSE": "d0688aa1d5d562e816b16772805caad708b93e8e3cfdb7aecc8bb9fd1ee18a73"
+      }
+    },
+    "1.0.0": {
+      "archive": "116f3bb7612a8f27e1c584563a1264eb8e828b5ee1951960fe2cb6c0e5210a18",
+      "files": {
+        "plugin.json": "2f98b60750d8f1243f8de7ac3e60c108859980d279affb519038d8b9fe2e1c8a",
+        "package.json": "05104249872c02705c85fdbbbd4cf88053428c32efcc7be67c29962ef8a86294",
+        "main.py": "dbb226eb55c9e2d58981d768eed53cf3b40177c310825a5c328ce2efbd6780e2",
+        "dist/index.js": "04753b366ad3273d00a1ebad8f86f315cf276b6c9e7393b63e493990afc77d60",
+        "LICENSE": "d0688aa1d5d562e816b16772805caad708b93e8e3cfdb7aecc8bb9fd1ee18a73"
+      }
+    },
+    "2.0.0": {
+      "archive": "1eb1f9f50720cdc0d7b08e9d5a3d505b62a0fabb710bb5677b51e7d8596c552c",
+      "files": {
+        "plugin.json": "2f98b60750d8f1243f8de7ac3e60c108859980d279affb519038d8b9fe2e1c8a",
+        "package.json": "621fd343fc4728e54c695eb6f9886ceee3a122cb85b56b9224ab463691f1dfc2",
+        "main.py": "9e2e2b8ec3a68b80019a53150597177caf0032c61dcda36a5f51725c0bc2e1bc",
+        "dist/index.js": "67f9cd9367f356d4b9aac6d4dcc611a3c93c75f7df410722cdd1774066f7b5a1",
+        "LICENSE": "d0688aa1d5d562e816b16772805caad708b93e8e3cfdb7aecc8bb9fd1ee18a73"
+      }
+    }
+  }
+}

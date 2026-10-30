@@ -1,0 +1,53 @@
+[package]
+name = "sideloader-core"
+version = "0.6.0"
+edition = "2024"
+rust-version = "1.85"
+license = "BSD-3-Clause"
+build = "build.rs"
+
+[features]
+e2e-process-fixture = []
+
+[[test]]
+name = "e2e-process"
+path = "src/e2e_process.rs"
+harness = false
+required-features = ["e2e-process-fixture"]
+
+[dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+flate2 = "1"
+futures-util = "0.3"
+hex = "0.4"
+hmac = "0.12"
+libc = "0.2"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "hickory-dns", "stream", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+subtle = "2"
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "process", "sync", "signal", "time", "net", "fs"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
+
+[build-dependencies]
+sha2 = "0.10"
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "unwind"
+
+[profile.dev]
+debug = 0

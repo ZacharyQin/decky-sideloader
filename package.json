@@ -1,21 +1,28 @@
 {
   "name": "decky-sideloader",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "List, update, and install zip-sourced Decky plugins from GitHub releases.",
   "license": "BSD-3-Clause",
   "type": "module",
   "scripts": {
-    "build": "rollup -c",
-    "watch": "rollup -c -w",
+    "build": "pnpm build:backend && rollup -c",
+    "build:backend": "python3 -B scripts/backend_build.py",
+    "watch": "pnpm build:backend && rollup -c -w",
     "typecheck": "tsc --noEmit",
     "release:notes": "python3 -B scripts/release_notes.py",
     "package-plugin": "python3 -B scripts/package-plugin.py",
     "test": "bun test tests",
-    "test:python": "python3 -B -m unittest discover -s tests -v"
+    "test:rust": "cargo test --locked --manifest-path backend-rs/Cargo.toml",
+    "test:python": "cargo build --locked --manifest-path backend-rs/Cargo.toml && python3 -B -m unittest discover -s tests -p test_bridge.py -v",
+    "test:reference": "python3 -B scripts/test-reference.py",
+    "test:licenses": "python3 -B -m unittest discover -s tests -p test_license_generation.py -v",
+    "test:e2e": "python3 -B scripts/test-e2e.py",
+    "test:all": "python3 -B scripts/test-all.py"
   },
   "devDependencies": {
     "@decky/rollup": "^1.0.2",
     "@decky/ui": "^4.11.0",
+    "@rollup/plugin-terser": "1.0.2",
     "@types/react": "19.1.1",
     "@types/react-dom": "19.1.1",
     "@types/react-router": "5.1.20",

@@ -258,13 +258,15 @@ QAM에서 **Sideloader**를 열고 원하는 작업의 절차를 선택하세요
 <details id="build">
 <summary>소스에서 빌드하기</summary>
 
-Node.js, pnpm, Bun, Python 3가 필요합니다. 저장소 루트에서 다음 명령을 실행하세요.
+x86-64 Linux에서 빌드하며 Node.js, pnpm, Bun, Python 3.11+, Rust/Cargo(Rust 1.85+)가 필요합니다. 기본 대상은 `x86_64-unknown-linux-gnu`이며 CI는 Ubuntu 22.04를 사용합니다. 저장소 루트에서 다음 명령을 실행하세요.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm test
+pnpm test:rust
 pnpm test:python
+pnpm test:reference
 pnpm build
 ```
 
@@ -274,9 +276,11 @@ pnpm build
 pnpm package-plugin
 ```
 
-ZIP에는 프런트엔드, Python 백엔드, 라이선스 고지와 6개 언어의 README가 포함됩니다. 기기 설정, 로그, 백업은 넣지 마세요.
+ZIP에는 프런트엔드, Rust 실행 파일, Decky용 Python 어댑터, 의존성 라이선스 전문과 6개 언어의 README가 포함됩니다. 기기 설정, 로그, 백업은 넣지 마세요.
 
-결과물은 `dist/decky-sideloader-<version>.zip`입니다. 백엔드 소스는 `backend/main.py`와 기능별 `backend/sideload/`에 있으며, 패키징할 때 Loader가 요구하는 `main.py`와 `py_modules/sideload/`로 배치됩니다. 소스 디렉터리 구조를 그대로 기기에 복사하지 마세요.
+결과물은 `dist/decky-sideloader-<version>.zip`입니다. 비즈니스 로직은 `backend-rs/`에 있으며 `backend/main.py`는 Decky 수명 주기, RPC와 이벤트만 연결합니다. 패키지는 이를 `bin/sideloader-core`와 Loader가 요구하는 `main.py`에 배치하고 `dist/backend.json`에 빌드 식별 정보를 담습니다. `pnpm build`는 먼저 Rust release와 고정된 의존성의 라이선스를 생성하며, `pnpm test:python`은 debug 실행 파일로 실제 자식 프로세스를 테스트합니다. `tests/reference_backend/`의 동결된 Python 0.5.0 백엔드는 마이그레이션 검증용이며 실행 패키지에 포함되지 않습니다. 소스 디렉터리 구조를 그대로 기기에 복사하지 마세요.
+
+Python 어댑터는 버전이 명시된 표준 입출력 IPC로 Rust 프로세스 하나를 감독합니다. 작업 상태와 영속화는 Rust가 소유합니다. 실패한 프로세스를 자동 재시작하거나 결과가 불명확한 네이티브 요청을 재실행하지 않습니다. 자체 업데이트는 새 인스턴스가 시작된 뒤 실행 중인 Rust 바이너리/빌드, 로드된 프런트엔드와 설치 파일 해시를 함께 확인합니다.
 
 `.github/workflows/build.yml`의 GitHub workflow는 Pull Request와 `main`으로의 푸시를 검사하고 빌드한 뒤 설치 ZIP을 아티팩트로 업로드합니다. `package.json` 버전과 일치하는 `v<version>` 태그를 푸시하면 ZIP과 `CHANGELOG.md`의 해당 버전 영어·중국어 전체 내용을 포함한 GitHub Release도 게시합니다.
 

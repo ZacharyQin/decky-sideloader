@@ -10,7 +10,7 @@ import { updateViewState, useViewState } from "./viewState";
 
 const groups = [
   ["project", "本插件"], ["decky", "Decky"], ["icons", "图标"], ["qr", "二维码"],
-  ["markdown", "Markdown"], ["versions", "版本比较"], ["transitive", "Markdown 间接依赖"], ["embedded", "内嵌代码来源"],
+  ["markdown", "Markdown"], ["versions", "版本比较"], ["transitive", "前端间接依赖"], ["rust", "Rust 后端依赖"], ["embedded", "内嵌代码来源"],
 ] as const;
 let pending: Promise<{ entries: LicenseEntry[] }> | null = null;
 function readNotices() {

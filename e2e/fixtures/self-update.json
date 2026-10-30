@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "cases": [
+    {"id":"self_complete","action":"complete","stage":"completed","dispatches":1,"confirms":1,"cancels":0},
+    {"id":"self_cancel_ready","action":"cancel_ready","stage":"cancelled","dispatches":0,"confirms":0,"cancels":0},
+    {"id":"self_cancel_prompt","action":"cancel_prompt","stage":"cancelled","dispatches":1,"confirms":0,"cancels":1},
+    {"id":"self_bad_digest","action":"bad_digest","stage":"failed","dispatches":0,"confirms":0,"cancels":0},
+    {"id":"self_download_error","action":"download_error","stage":"failed","dispatches":0,"confirms":0,"cancels":0},
+    {"id":"self_cancel_downloading","action":"cancel_downloading","stage":"cancelled","dispatches":0,"confirms":0,"cancels":0,"gate":true},
+    {"id":"self_restart_downloading","action":"restart_downloading","stage":"failed","dispatches":0,"confirms":0,"cancels":0,"gate":true},
+    {"id":"self_restart_ready","action":"restart_ready","stage":"completed","dispatches":1,"confirms":1,"cancels":0},
+    {"id":"self_wrong_frontend","action":"wrong_frontend","stage":"completed","dispatches":1,"confirms":1,"cancels":0}
+  ]
+}

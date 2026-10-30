@@ -4,6 +4,20 @@ This file records reviewable source versions. A version commit does not imply a 
 
 本文件记录可审核的源码版本。版本提交不代表发布或已部署，版本号以 `package.json` 为准。每条记录必须英语在前、中文在后；GitHub Release 正文须使用本文件对应版本的完整章节，不以自动生成的提交摘要或整份日志代替。发布须获明确授权。
 
+## [0.6.0] - 2026-10-28
+
+### English
+
+- Reduce installation and update downloads by keeping documentation and screenshots on GitHub instead of in the plugin package.
+- Preserve existing settings, repository associations, ownership and freeze choices, and installation history when updating.
+- Group open-source licenses into frontend components and Rust backend dependencies; correct misidentified copyright attributions and keep full license texts available offline.
+
+### 中文
+
+- 文档和截图保留在 GitHub，不再随插件安装，减少安装与更新的下载量。
+- 升级后沿用已有设置、仓库关联、归属与冻结选择，以及安装历史。
+- 开源许可按前端组件和 Rust 后端依赖分组，修正误识别的版权署名，保留可离线查看的许可证全文。
+
 ## [0.5.0] - 2026-10-28
 
 ### English

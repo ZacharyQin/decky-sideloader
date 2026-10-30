@@ -258,13 +258,15 @@ Este README está disponible en los mismos seis idiomas mediante los enlaces de 
 <details id="build">
 <summary>Compilar desde el código fuente</summary>
 
-Necesitas Node.js, pnpm, Bun y Python 3. Ejecuta estos comandos desde la raíz del repositorio:
+Compila en Linux x86-64 con Node.js, pnpm, Bun, Python 3.11+ y Rust/Cargo (Rust 1.85+). El destino predeterminado es `x86_64-unknown-linux-gnu`; CI usa Ubuntu 22.04. Ejecuta estos comandos desde la raíz del repositorio:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm test
+pnpm test:rust
 pnpm test:python
+pnpm test:reference
 pnpm build
 ```
 
@@ -274,9 +276,11 @@ Después de compilar, crea el ZIP de instalación:
 pnpm package-plugin
 ```
 
-El ZIP incluye la interfaz, el backend de Python, los avisos de licencia y los seis README. No añadas ajustes del dispositivo, registros ni copias de seguridad.
+El ZIP incluye la interfaz, el ejecutable Rust, el adaptador Python para Decky, los textos de licencia de las dependencias y los seis README. No añadas ajustes del dispositivo, registros ni copias de seguridad.
 
-El resultado es `dist/decky-sideloader-<version>.zip`. El código del backend está en `backend/main.py` y en los módulos por función de `backend/sideload/`; el empaquetado los coloca en `main.py` y `py_modules/sideload/`, como requiere Loader. No copies directamente la estructura del código fuente al dispositivo.
+El resultado es `dist/decky-sideloader-<version>.zip`. La lógica está en `backend-rs/`; `backend/main.py` solo adapta el ciclo de vida, los RPC y los eventos de Decky. El paquete los coloca en `bin/sideloader-core` y en el `main.py` exigido por Loader, con la identidad de compilación en `dist/backend.json`. `pnpm build` compila primero Rust en modo release y recopila las licencias de las versiones fijadas; `pnpm test:python` compila el ejecutable debug para pruebas con procesos reales. El backend Python 0.5.0 congelado en `tests/reference_backend/` sirve de referencia y no se distribuye. No copies directamente la estructura del código fuente al dispositivo.
+
+El adaptador Python supervisa un proceso Rust por IPC versionado en la entrada/salida estándar. Rust mantiene el estado de las tareas y la persistencia. Un proceso que falla no se reinicia automáticamente ni se repiten solicitudes nativas de resultado incierto. La actualización de Sideloader verifica el binario/compilación en ejecución, la interfaz cargada y los hashes de archivos después de iniciar una nueva instancia.
 
 El workflow de GitHub en `.github/workflows/build.yml` valida y compila las pull requests y los envíos a `main`, y sube el ZIP de instalación como artefacto. Al enviar una etiqueta `v<version>` que coincida con `package.json`, también publica una GitHub Release con el ZIP y la sección completa en inglés y chino de esa versión de `CHANGELOG.md`.
 

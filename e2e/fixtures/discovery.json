@@ -1,0 +1,36 @@
+{
+  "schema":1,
+  "query":"beta tools",
+  "repo":"fixture/monorepo",
+  "tag":"v3.2.1",
+  "plugin_path":"packages/beta",
+  "dependencies":[
+    {"name":"lib-a","url":"https://github.com/fixture/dependencies/releases/download/v1/lib-a.bin","text":"dependency A from remote fixture\n","sha256":"9f5b9f9d381c4dfafbaf55b84522fad8365726b001ef93dd9865e9b1c1343a46"},
+    {"name":"lib-b","url":"https://github.com/fixture/dependencies/releases/download/v1/lib-b.bin","text":"dependency B from remote fixture\n","sha256":"52078ac71be35149c9ecc2f5eecad58baecbfb0194d6d6542b9e00bfdf3cfb7f"}
+  ],
+  "packages":{
+    "alpha":{"name":"Alpha Fixture","folder":"alpha-fixture","version":"1.0.0","files":{
+      "plugin.json":"{\"name\":\"Alpha Fixture\",\"flags\":[]}\n",
+      "package.json":"{\"name\":\"alpha-fixture\",\"version\":\"1.0.0\",\"devDependencies\":{\"@decky/api\":\"1\"}}\n",
+      "dist/index.js":"export const alphaFixture = true;\n","LICENSE":"BSD-3-Clause\n"
+    }},
+    "beta":{"name":"Beta Fixture","folder":"beta-fixture","version":"3.2.1","comment":"fixed-monorepo-source","files":{
+      "plugin.json":"{\"name\":\"Beta Fixture\",\"author\":\"Fixture\",\"flags\":[]}\n",
+      "package.json":"{\"name\":\"beta-fixture\",\"version\":\"3.2.1\",\"repository\":\"fixture/monorepo\",\"devDependencies\":{\"@decky/api\":\"1\"},\"remote_binary\":[{\"name\":\"lib-a\",\"url\":\"https://github.com/fixture/dependencies/releases/download/v1/lib-a.bin\",\"sha256hash\":\"9f5b9f9d381c4dfafbaf55b84522fad8365726b001ef93dd9865e9b1c1343a46\"},{\"name\":\"lib-b\",\"url\":\"https://github.com/fixture/dependencies/releases/download/v1/lib-b.bin\",\"sha256hash\":\"52078ac71be35149c9ecc2f5eecad58baecbfb0194d6d6542b9e00bfdf3cfb7f\"}]}\n",
+      "main.py":"# fixed beta fixture\n","dist/index.js":"export const betaFixture = '3.2.1';\n","LICENSE":"BSD-3-Clause\n"
+    },"merged_files":{
+      "plugin.json":"{\"name\":\"Beta Fixture\",\"author\":\"Fixture\",\"flags\":[]}\n",
+      "package.json":"{\"devDependencies\":{\"@decky/api\":\"1\"},\"name\":\"beta-fixture\",\"repository\":\"fixture/monorepo\",\"version\":\"3.2.1\"}",
+      "main.py":"# fixed beta fixture\n","dist/index.js":"export const betaFixture = '3.2.1';\n","LICENSE":"BSD-3-Clause\n",
+      "bin/lib-a":"dependency A from remote fixture\n","bin/lib-b":"dependency B from remote fixture\n"
+    }}
+  },
+  "cases":[
+    {"id":"discovery_multi","action":"success","searches":1,"probes":1,"releases":2,"dispatches":1,"stage":"closed"},
+    {"id":"discovery_dependency_failure","action":"dependency_failure","searches":1,"probes":1,"releases":2,"dispatches":0,"stage":"failed"},
+    {"id":"discovery_truncated","action":"truncated","searches":1,"probes":1,"releases":0,"dispatches":0,"stage":null},
+    {"id":"discovery_pagination_failure","action":"pagination_failure","searches":1,"probes":1,"releases":1,"dispatches":0,"stage":null},
+    {"id":"discovery_restart","action":"restart","searches":2,"probes":2,"releases":3,"dispatches":1,"stage":"closed"},
+    {"id":"discovery_crash_dependency","action":"crash_dependency","searches":1,"probes":1,"releases":2,"dispatches":1,"stage":"closed"}
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "download_success": {
+    "https://api.github.com/repos/fixture/target/git/trees/HEAD?recursive=1": 1,
+    "https://api.github.com/repos/fixture/target/git/blobs/330ef9c01d475fdad707499b30c56591c5278cdd": 1,
+    "https://api.github.com/repos/fixture/target/git/blobs/f3d588568e041c4020d8c7772d759765750a4c82": 1,
+    "https://api.github.com/repos/fixture/target/git/blobs/6498acb7594c7ad18f19ff043c4db057504d1c45": 1,
+    "https://api.github.com/repos/fixture/target/releases?per_page=100&page=1": 2,
+    "https://github.com/fixture/target/releases/download/v2.0.0/plugin.zip;range=bytes=-65557": 1,
+    "https://github.com/fixture/target/releases/download/v2.0.0/plugin.zip;range=bytes=357-386": 1,
+    "https://github.com/fixture/target/releases/download/v2.0.0/plugin.zip;range=bytes=387-413": 1,
+    "https://github.com/fixture/target/releases/download/v2.0.0/plugin.zip;range=bytes=414-487": 1,
+    "https://github.com/fixture/target/releases/download/v2.0.0/plugin.zip": 1
+  },
+  "download_bad_zip": {
+    "https://api.github.com/repos/fixture/target/git/trees/HEAD?recursive=1": 1,
+    "https://api.github.com/repos/fixture/target/git/blobs/330ef9c01d475fdad707499b30c56591c5278cdd": 1,
+    "https://api.github.com/repos/fixture/target/git/blobs/f3d588568e041c4020d8c7772d759765750a4c82": 1,
+    "https://api.github.com/repos/fixture/target/git/blobs/6498acb7594c7ad18f19ff043c4db057504d1c45": 1,
+    "https://api.github.com/repos/fixture/target/releases?per_page=100&page=1": 2,
+    "https://github.com/fixture/target/releases/download/v2.0.0/plugin.zip;range=bytes=-65557": 1,
+    "https://github.com/fixture/target/releases/download/v2.0.0/plugin.zip": 1
+  }
+}
