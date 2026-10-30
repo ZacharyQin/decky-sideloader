@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {existsSync, readFileSync, readdirSync} from 'node:fs';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {dirname, join, relative} from 'node:path';
-import {Host, root, sha, text} from './harness.mjs';
+import {Host, bounded, root, sha, text} from './harness.mjs';
 import {workflow, workflowInputs} from './workflows.mjs';
 import {fullSelfUpdate, selfInputs} from './self_update.mjs';
 import {discovery, discoveryInputs} from './discovery.mjs';
@@ -243,7 +243,38 @@ async function selfUpdate() {
       await host.eventually(() => host.frontendCalls.filter(name => name === 'get_self_update_status').length > frontendReads, 'frontend controller itself queried self-update status');
       const current = await host.call('get_self_update_status', {version:frontend.version, fingerprint:frontend.fingerprint});
       assertSelfUpdate({id:mode, stage:mode === 'matching' ? 'completed' : 'verifying', compatible}, current);
-      await host.unmount();
+      if (mode === 'matching') {
+        const originalCall = host.loader.call;
+        let release, entered = false;
+        const gate = new Promise(resolve => { release = resolve; });
+        host.loader.call = async (route, ...args) => {
+          if (route === 'loader/get_plugins') { entered = true; await gate; }
+          return originalCall.call(host.loader, route, ...args);
+        };
+        const pendingRead = host.call('list_sideload_plugins');
+        let unmount, failure, waiting = true;
+        try {
+          await host.eventually(() => entered, 'actual native snapshot blocked before frontend disposal');
+          unmount = host.unmount();
+          unmount.catch(() => {});
+          await bounded((async () => {
+            while (waiting && host.screen) await new Promise(resolve => setImmediate(resolve));
+          })(), 1000, 'page removal before fixture drain');
+          assert.ok(host.plugin && host.backendEvents.has('native_management_requested'), 'normal unmount must retain the native responder until outstanding reads settle');
+        } catch (error) { failure = error; }
+        finally {
+          waiting = false;
+          release();
+          host.loader.call = originalCall;
+          const [disposed, read] = await Promise.allSettled([unmount, pendingRead]);
+          if (disposed.status === 'rejected') failure ??= disposed.reason;
+          if (read.status === 'rejected') failure ??= read.reason;
+          if (!failure) assert.equal(read.value.native_snapshot.ok, true, 'in-flight native read received a real reply, not timeout fallback');
+        }
+        if (failure) throw failure;
+        assert.equal(host.pending.size, 0);
+        checks.push('in-flight-native-read/unmount');
+      } else await host.unmount();
       checks.push(mode);
     }
     assert.equal(history(host).length, 0, 'cross-instance verification never redispatches installation');

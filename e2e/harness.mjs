@@ -54,7 +54,12 @@ export class Host {
       else if (message.event) {
         host.observedEvents.push(message.event);
         host.observedEventDetails.push({name:message.event,args:message.args});
-        for (const fn of host.backendEvents.get(message.event) ?? []) Promise.resolve(fn(...message.args)).catch(error => host.eventErrors.push(String(error)));
+        for (const fn of host.backendEvents.get(message.event) ?? []) {
+          const task = Promise.resolve().then(() => fn(...message.args))
+            .catch(error => host.eventErrors.push(String(error)))
+            .finally(() => host.eventTasks.delete(task));
+          host.eventTasks.add(task);
+        }
       } else {
         const item = host.pending.get(message.id);
         if (!item) { host.protocolErrors.push('unexpected response id'); return; }
@@ -71,7 +76,7 @@ export class Host {
   }
   pending = new Map(); backendEvents = new Map(); loaderEvents = new Map(); windowEvents = new Map();
   observedEvents = []; observedEventDetails = []; rpcCalls = []; frontendCalls = []; frontendCallDetails = []; nativeCalls = []; eventErrors = []; protocolErrors = []; installEventAcks = []; selfEventAcks = [];
-  timers = new Set(); corePids = new Set(); toasts = []; clipboardWrites = []; frontendMounts = 0; stderr = ''; nextId = 0; modalCount = 0;
+  timers = new Set(); eventTasks = new Set(); corePids = new Set(); toasts = []; clipboardWrites = []; frontendMounts = 0; stderr = ''; nextId = 0; modalCount = 0;
   add(map, name, fn) { if (!map.has(name)) map.set(name, new Set()); map.get(name).add(fn); return fn; }
   remove(map, name, fn) { map.get(name)?.delete(fn); if (!map.get(name)?.size) map.delete(name); }
   call(method, ...args) {
@@ -251,9 +256,25 @@ export class Host {
   async operation(stage) {
     return this.eventually(async () => { const value = await this.call('get_operation'); return value?.stage === stage && value; }, `operation ${stage}`);
   }
+  async settle() {
+    let active = true;
+    try {
+      await bounded((async () => {
+        while (active) {
+          const generation = this.nextId;
+          await Promise.allSettled([...this.pending.values()].map(item => item.promise).concat([...this.eventTasks]));
+          await new Promise(resolve => setImmediate(resolve));
+          if (!this.pending.size && !this.eventTasks.size && this.nextId === generation) return;
+        }
+      })(), 3000, 'pending fixture RPC/event cleanup');
+    } finally { active = false; }
+  }
   async unmount(settle = true, pendingNativeUninstall = false) {
     if (this.modalScreen) { await React.act(async () => this.modalScreen.unmount()); this.modalScreen = undefined; }
     if (this.screen) { await React.act(async () => this.screen.unmount()); this.screen = undefined; }
+    // Normal remounts drain bootstrap reads while their native responder is still attached.
+    // Crash/reload cases deliberately pass false and let actual backend shutdown settle them.
+    if (settle) await this.settle();
     if (this.plugin) { const plugin = this.plugin; this.plugin = undefined; await React.act(async () => { plugin.onDismount(); }); }
     assert.equal(this.backendEvents.size, 0); assert.equal(this.loaderEvents.size, 0); assert.equal(this.windowEvents.size, 0);
     if (pendingNativeUninstall) {
@@ -261,7 +282,7 @@ export class Host {
       assert.equal(this.timers.size,1);
       assert.equal([...this.timers][0]._idleTimeout,120000,'unexpected timer beyond the native uninstall watchdog');
     } else assert.equal(this.timers.size, 0, 'application timer leak');
-    if (settle) await bounded(Promise.allSettled([...this.pending.values()].map(item => item.promise).filter(Boolean)), 3000, 'pending fixture RPC cleanup');
+    if (settle) await this.settle();
   }
   async close(check = true) {
     try {
@@ -274,6 +295,7 @@ export class Host {
       if (check) {
         assert.equal(this.closed?.core_returncode, 0, this.stderr);
         assert.equal(this.pending.size, 0);
+        assert.equal(this.eventTasks.size, 0, 'backend event handler cleanup');
         assert.deepEqual(this.eventErrors, []); assert.deepEqual(this.protocolErrors, []);
         if (this.closed.http) {
           assert.deepEqual(this.closed.http.errors, [], 'strict HTTP fixture errors');
