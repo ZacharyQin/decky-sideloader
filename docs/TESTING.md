@@ -2,7 +2,19 @@
 
 The current local acceptance completed `pnpm test:all`: 242 frontend tests, 85 current-Rust library tests plus 5 IPC tests, 18 actual Python/Rust bridge tests, 341 frozen-reference tests, 6 license-generator tests, both Clippy targets, release build, all 60 application groups, and the exact10-member runtime ZIP check. One public-service observation collector is intentionally ignored in the deterministic Rust run and was executed separately. Test counts are not coverage percentages.
 
-[TEST_GAPS.md](TEST_GAPS.md) records the original12-category audit and the current completion boundary. G01–G11 now have the specified local matrices and combined acceptance. G12 records actual public-service and target-OS observations separately; fixture results do not establish current Loader loading, Steam layout/physical input, game performance or remote GitHub Actions.
+[TEST_GAPS.md](TEST_GAPS.md) records the original12-category audit and the current completion boundary. G01–G11 now have the specified local matrices and combined acceptance. G12 records actual public-service and target-OS observations separately; fixture results do not establish current Loader loading, Steam layout/physical input or game performance. Actual remote Actions have now run and failed at standard-library notice collection before application E2E and packaging.
+
+## Remote CI observation — 2026-10-30
+
+The failure has now been reproduced with the matching official Rust 1.99.1 compiler archive, verified against the official release manifest. Its standard-library notice is 1,499,465 bytes and contains 16 license expressions, including out-of-tree dependency materials; the local Arch notice is 3,691 bytes with only 3 expressions. The collector now accepts the reviewed official expressions and reads at most 8 MiB plus one sentinel byte, while retaining the complete original, version binding and rejection of new expressions. The compressed official fixture includes archive provenance and an exact decompressed SHA256. The 9 license tests, local release build and actual Rust 1.99.1/sysroot collector all pass; the new tests first failed on the original collector. Remote verification of this correction is tracked separately and is not yet a passing CI result.
+
+### First failed run (historical observation)
+
+[PR #1](https://github.com/ZacharyQin/decky-sideloader/pull/1), head `7b2b45f151b2797d3535a286f75d34b27948856f`, was checked against [Build 41097843512](https://github.com/ZacharyQin/decky-sideloader/actions/runs/41097843512): completed/failure, build failed and release skipped. The head matches the approved isolated testing branch. Typecheck,242 frontend tests, formatting, both Clippy targets,85 library plus5 IPC tests,18 bridge tests,341 frozen-reference tests and6 license-generator tests passed remotely.
+
+`pnpm build` compiled the release core but then stopped in `scripts/backend_build.py::rust_standard_notice` with `Rust standard-library notice exceeds 1 MiB`. The runner used rustc1.99.1. Its raw notice and exact byte size were not included in the log; changes to its license expressions have not been established. The unchanged guard was independently reproduced with a synthetic1048577-byte document; this is guard reproduction, not the actual runner document. Application60-group E2E and runtime ZIP validation were not reached, and no distribution artifact was uploaded. A direct retrieval attempt for the versioned public documentation URL returned404 and did not provide the missing material.
+
+The next step is to obtain and review the matching toolchain's original notice before deciding on a notice-collection or toolchain policy change. No limit/recognized-license check was relaxed, no toolchain was downgraded, and no extra commit, push, PR, comment, version or deployment was made for this verification. Existing0.6.0 local acceptance evidence remains valid within its recorded environment.
 
 ## Commands
 
@@ -21,7 +33,7 @@ Individual entries:
 - `pnpm test:rust`: current Rust, protocol and fixed differential corpus.
 - `pnpm test:python`: build the actual debug core and run18 adapter/IPC tests.
 - `pnpm test:reference`: explicitly listed frozen0.5 Python implementation; not current-Rust coverage.
-- `pnpm test:licenses`: six generator/active-dependency/material checks.
+- `pnpm test:licenses`: nine generator/active-dependency/material checks, including the official rustup notice, unknown dependency-license rejection and bounded input.
 - `pnpm build && pnpm test:e2e`: all60 application groups.
 - `pnpm test:e2e --case discovery_crash_dependency --report test-results/dependency-crash.json`: one selected group.
 
@@ -90,7 +102,7 @@ python3 -B scripts/test-device.py --ssh-target sd --package test-results/device-
 
 The wrapper refuses any package member differing from current local runtime inputs. SSH keeps strict host-key checking and existing account authentication. The remote runner creates a unique0700 owned directory, verifies ZIP/ELF metadata, imports the package's production Python adapter, executes the release core, checks handshake/ping/settings/null operation and clean shutdown, then removes only the verified-owned stopped profile. Timeout/unexpected entries are retained with an exact probe identifier. It does not edit the installed plugin, Loader, user settings or global services.
 
-The current package passed this probe on SteamOS3.9.5/x86_64/glibc2.43/Python3.14.6 with child exit0, zero pending RPCs and owned-profile removal. Actual installed-plugin loading, Steam layouts/physical input/game resources and remote Actions remain separate evidence requirements.
+The current package passed this probe on SteamOS3.9.5/x86_64/glibc2.43/Python3.14.6 with child exit0, zero pending RPCs and owned-profile removal. Actual installed-plugin loading, Steam layouts/physical input/game resources remain separate evidence requirements; remote Actions status is recorded above and has not passed.
 
 ## Updating inputs
 

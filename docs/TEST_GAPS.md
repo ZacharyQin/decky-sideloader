@@ -2,7 +2,11 @@
 
 ## 当前实施进度（2026-10-30）
 
-用户要求本轮直接补齐全部12类，Neo本人实施和验证。**G01–G11的规定本地矩阵和完整组合已通过；G12已有实际网络与Deck隔离后端兼容证据，当前安装插件／Steam界面和远端CI仍未验收。**
+用户要求本轮直接补齐全部12类，Neo本人实施和验证。**G01–G11的规定本地矩阵和完整组合已通过；G12已有实际网络与Deck隔离后端兼容证据。当前源码的远端CI已执行但失败，当前安装插件／Steam界面仍未验收。**
+
+最新修复核验：已从官方发布清单校验过SHA的Rust 1.99.1编译器安装包取得原始声明，1,499,465B／16种许可表达式；本机Arch声明仅3,691B／3种。确认是生成器只适配本机小文档，遗漏官方工具链材料范围。已改为有界读取8MiB、识别已审阅表达式并原样保留全文，新增官方原件压缩夹具／来源SHA、未知许可拒绝和大小边界回归。9项许可、本地正式构建、真实Rust 1.99.1／sysroot收集均通过；原生成器先复现失败。远端修复重跑结果另记，目前仍不能称CI通过。测试夹具保留版本管理，最终包继续精确10文件白名单。
+
+首次远端结果（2026-10-30 17:30Z核验，历史观察）：[PR #1](https://github.com/ZacharyQin/decky-sideloader/pull/1) 的 [Build 41097843512](https://github.com/ZacharyQin/decky-sideloader/actions/runs/41097843512) 对应提交 `7b2b45f151b2797d3535a286f75d34b27948856f`，终态failure，release跳过。TypeScript、242前端、fmt、两Clippy、85库＋5IPC、18桥接、341冻结参照和6许可测试通过；`pnpm build` 在收集Rust标准库许可时以 `Rust standard-library notice exceeds 1 MiB` 退出，尚未运行远端60组应用或ZIP验证。CI使用rustc1.99.1；日志没有原始声明或确切大小，不能据此判断新许可内容。未放宽大小／许可检查、固定或降级工具链来规避失败；需先取得并审阅对应工具链原始声明，再决定是否调整收集策略。原本地验收包／日志保留，版本仍0.6.0。
 
 | 编号 | 当前状态 | 已验证范围 | 剩余范围 |
 | --- | --- | --- | --- |
@@ -17,13 +21,13 @@
 | G09 | 本地统一通过 | 真实手动批量部分失败；实际Rust60秒定时、重挂载仅一次toast、卸载无订阅／权限、关闭通知仍保存；不以frontend RPC代替scheduler | 实际Steam通知见G12 |
 | G10 | 本地统一通过 | 实际许可正文SHA，5项Rust分享生命周期；真实私有接口UI导出／QR／复制／HEAD／GET／停止和独立ZIP内容／隐私／权限 | 不等于物理远端LAN客户端验收 |
 | G11 | 本地统一通过 | 严格HTTP方法／headers／Range／消费和负控制；有效ZIP单项破坏／CRC／限额；IPC32MiB／UTF8／depth／并发／EOF、18真实桥接及资源回收 | 没有任意源码mutation campaign结论 |
-| G12 | 部分实际验收 | 真实Rust四模式固定公开资产均188377B／SHA一致，TLS／URL／跳转未放宽；API均rate_limited；当前最终包在实际Deck/Python3.14.6隔离SDK profile启动原适配器／release ELF，握手／ping／settings／null operation／退出0／pending0／清理通过 | 当前安装插件加载、Steam布局／实体输入／游戏资源性能、远端Actions未验；本轮没有生产安装或提交推送授权 |
+| G12 | 部分实际验收，远端CI失败 | 真实Rust四模式固定公开资产均188377B／SHA一致，TLS／URL／跳转未放宽；API均rate_limited；当前最终包在实际Deck/Python3.14.6隔离SDK profile启动原适配器／release ELF，握手／ping／settings／null operation／退出0／pending0／清理通过；隔离测试分支PR #1的实际Actions已核终态 | 当前安装插件加载、Steam布局／实体输入／游戏资源性能仍未验；远端build被标准库声明1MiB检查阻断，应用E2E／ZIP未执行；本轮无生产安装或Release |
 
 **当前完整 `pnpm test:all` 已通过**：242前端、85现行Rust库＋5 IPC（公共服务观察器1项默认ignored且另外显式执行）、18真实桥接、341冻结Python、6许可、typecheck/fmt/两套Clippy、release构建、全60组应用及10成员运行ZIP/CRC/身份/私有标记排除。`test-all-current-status.json` code0；`e2e-final60.json` status=passed、60唯一组。旧38组/各分次/失败full记录只作历史，不再限制当前完成状态。实际定时和慢传总预算各使用真实一分钟；其他UI夹具50ms轮询不构成性能结论。
 
 有红证据的产品修复包括ZIP注释／物理重复项／IPC换行／备份0600／失败下载状态／Release重验／显式恢复ACK，依赖序号及有界进度worker、SHA失败状态，原包不覆盖且拒绝链接／不匹配。备份已原子临时写→完整校验→不覆盖发布，合法本任务完整备份保留原SHA/age复用。第二依赖真实中断的stale downloading及临时目录遗留均已修且分组／全60通过：只按匹配source/operation/count marker、UID/0700、marker0600单链接及已知普通0600单链接成员回收，未知内容保留。八个独立保护变体是一个库测试内矩阵。取消／未知请求／实例关联保护保持。
 
-当前证据根Neo `work/sideloader-close-gaps-z_jfbhw3/`：PLAN、`test-all-current.log/status.json`、`e2e-final60.json`、`final-artifact-identity.json`、`live-services.json`、`real-public-reference.json`、`device-private-current.json`、`ignore-verification.json`、`owned-profile-cleanup.json`。当前包2886561B、SHA `a9aad019328df1dd102f79c15c1b90b9f010e7cb589ec61d786956ecf45e064e`；ELF SHA `867ee4d90094629569311146424be689b2195bc04462bfea24e26fd6e43b1ddc`、requiredGLIBC2.34，实际Deck glibc2.43。三份旧自有超时profile已逐个核验清理，不通配删。没有生产部署、Git历史／远端修改、发布或Loader维护。Node/React模拟宿主及真机隔离SDK profile都不替代当前实际Loader/Steam验收。
+当前证据根Neo `work/sideloader-close-gaps-z_jfbhw3/`：PLAN、`test-all-current.log/status.json`、`e2e-final60.json`、`final-artifact-identity.json`、`live-services.json`、`real-public-reference.json`、`device-private-current.json`、`ignore-verification.json`、`owned-profile-cleanup.json`。当前包2886561B、SHA `a9aad019328df1dd102f79c15c1b90b9f010e7cb589ec61d786956ecf45e064e`；ELF SHA `867ee4d90094629569311146424be689b2195bc04462bfea24e26fd6e43b1ddc`、requiredGLIBC2.34，实际Deck glibc2.43。三份旧自有超时profile已逐个核验清理，不通配删。没有生产部署、发布或Loader维护。后续获准的隔离测试分支提交／推送和一次草稿PR已完成；原main/HEAD与索引保持不变，本次核验未新增提交／推送或评论。Node/React模拟宿主及真机隔离SDK profile都不替代当前实际Loader/Steam验收。
 
 ## 首次审计记录
 

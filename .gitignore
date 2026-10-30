@@ -40,6 +40,7 @@ HANDOFF.md
 runs/
 
 # Generated test output; keep test sources and fixtures versioned.
+!tests/fixtures/rust-std/*.gz
 /e2e-result.json
 /test-results/
 /.test-results/

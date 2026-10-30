@@ -1,3 +1,5 @@
+import gzip
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -88,6 +90,59 @@ class LicenseGraphTests(unittest.TestCase):
                 with self.assertRaises(SystemExit): module.rust_standard_notice(env)
                 path.unlink()
                 with self.assertRaises(SystemExit): module.rust_standard_notice(env)
+
+    def official_standard_library_notice(self):
+        directory = ROOT / 'tests/fixtures/rust-std'
+        provenance = json.loads((directory / 'rust-1.99.1.json').read_text())
+        raw = gzip.decompress((directory / 'rust-1.99.1-COPYRIGHT-library.html.gz').read_bytes())
+        self.assertEqual(len(raw), provenance['noticeBytes'])
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), provenance['noticeSHA256'])
+        return raw
+
+    def test_official_rustup_notice_above_one_mib_preserves_all_materials(self):
+        raw = self.official_standard_library_notice()
+        self.assertGreater(len(raw), 1024 * 1024)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / 'share/doc/rust/COPYRIGHT-library.html'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(raw)
+            def command(args, **kwargs):
+                return 'rustc 1.99.1 (58cf8f9c3 2026-10-13)' if args[-1] == '--version' else str(root)
+            with patch.object(module.subprocess, 'check_output', side_effect=command):
+                result = module.rust_standard_notice({})
+            self.assertEqual(result['noticeEvidence']['source'], 'rust-sysroot')
+            self.assertEqual(result['noticeEvidence']['sha256'], hashlib.sha256(raw).hexdigest())
+            self.assertEqual(result['documents'][1]['text'].encode(), raw)
+            for material in ('Out-of-tree dependencies', 'fortanix-sgx-abi-0.6.1', 'MPL-2.0',
+                             'LLVM-exception', 'Copyright (c) 2015 Andrew Gallant'):
+                self.assertIn(material, result['documents'][0]['text'])
+
+    def test_official_notice_with_unknown_dependency_license_is_rejected(self):
+        raw = self.official_standard_library_notice()
+        original = b'<b>License:</b> MPL-2.0'
+        self.assertEqual(raw.count(original), 1)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'COPYRIGHT-library.html'
+            path.write_bytes(raw.replace(original, b'<b>License:</b> Unreviewed-9.0'))
+            env = {'SIDELOADER_RUST_STD_COPYRIGHT': str(path), 'SIDELOADER_RUST_STD_VERSION': '1.99.1'}
+            def command(args, **kwargs):
+                return 'rustc 1.99.1 (58cf8f9c3 2026-10-13)' if args[-1] == '--version' else '/fixture/sysroot'
+            with patch.object(module.subprocess, 'check_output', side_effect=command):
+                with self.assertRaisesRegex(SystemExit, 'unrecognized.*Unreviewed-9.0'):
+                    module.rust_standard_notice(env)
+
+    def test_standard_library_notice_retains_a_bounded_input_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'COPYRIGHT-library.html'
+            with path.open('wb') as stream:
+                stream.truncate(8 * 1024 * 1024 + 1)
+            env = {'SIDELOADER_RUST_STD_COPYRIGHT': str(path), 'SIDELOADER_RUST_STD_VERSION': '1.99.1'}
+            def command(args, **kwargs):
+                return 'rustc 1.99.1 (58cf8f9c3 2026-10-13)' if args[-1] == '--version' else '/fixture/sysroot'
+            with patch.object(module.subprocess, 'check_output', side_effect=command):
+                with self.assertRaisesRegex(SystemExit, r'exceeds 8 MiB.*1\.99\.1.*COPYRIGHT-library\.html'):
+                    module.rust_standard_notice(env)
 
     def test_copyright_attribution_does_not_include_license_prose(self):
         docs = [{'text': 'Copyright (c) 2024 Example Person\nCopyright (c) [yyyy] [name of copyright owner]\nCopyright notice in the NOTICE file\nCopyright © 1991-2024 Unicode, Inc.\n'}]

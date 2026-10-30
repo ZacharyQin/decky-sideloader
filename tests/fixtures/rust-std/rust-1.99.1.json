@@ -1,0 +1,11 @@
+{
+  "toolchain": "1.99.1 (58cf8f9c3 2026-10-13)",
+  "manifestURL": "https://static.rust-lang.org/dist/channel-rust-1.99.1.toml",
+  "manifestSHA256": "fb152be80975c194aa5fc684b2aec3a6e14e2b855efe2faa4e5f8ae6e590f463",
+  "archiveURL": "https://static.rust-lang.org/dist/2026-10-15/rustc-1.99.1-x86_64-unknown-linux-gnu.tar.xz",
+  "archiveSHA256": "2ff05ff9c08a90861e7f6e4065b40a8b87463b4576186fd613871c3e37f2091f",
+  "archiveMember": "rustc-1.99.1-x86_64-unknown-linux-gnu/rustc/share/doc/rust/COPYRIGHT-library.html",
+  "noticeBytes": 1499465,
+  "noticeSHA256": "5647be074c8edf7339fd863055923a8fc80bc5610a8d4661ec3b767b9d392c27",
+  "compression": "gzip, mtime=0; decompression reproduces the unmodified official document"
+}

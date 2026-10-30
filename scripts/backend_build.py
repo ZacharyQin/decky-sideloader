@@ -97,9 +97,12 @@ def rust_standard_notice(environment):
     path = next((p for p in candidates if p.is_file()), None)
     if path is None:
         raise SystemExit('Rust standard-library copyright notice missing; install matching toolchain docs or set SIDELOADER_RUST_STD_COPYRIGHT and SIDELOADER_RUST_STD_VERSION')
-    raw = path.read_bytes()
-    if len(raw) > 1024 * 1024:
-        raise SystemExit('Rust standard-library notice exceeds 1 MiB')
+    # Official rustup notices include dependency texts; distro notices can be much smaller.
+    max_notice_bytes = 8 * 1024 * 1024
+    with path.open('rb') as stream:
+        raw = stream.read(max_notice_bytes + 1)
+    if len(raw) > max_notice_bytes:
+        raise SystemExit(f'Rust standard-library notice exceeds 8 MiB (rustc {version}, {path})')
     html = raw.decode('utf-8')
     if 'Copyright notices for The Rust Standard Library' not in html:
         raise SystemExit('Not a Rust standard-library copyright document')
@@ -109,7 +112,16 @@ def rust_standard_notice(environment):
     if 'Unicode-3.0' not in plain or 'Apache-2.0 OR MIT' not in plain or '1991-2024 Unicode, Inc' not in plain:
         raise SystemExit('Review Rust standard-library notices and Unicode license materials for this toolchain')
     found = {re.sub(r'\s+', ' ', item.strip()) for item in re.findall(r'<b>License:</b>\s*([^<]+)', html)}
-    known = {'Apache-2.0 OR MIT', 'Unicode-3.0', 'BSD-2-Clause AND (Apache-2.0 OR MIT)'}
+    # Includes the out-of-tree expressions reviewed in the official Rust 1.99.1 fixture.
+    # Preserve the entire original document; new expressions still require review.
+    known = {
+        'Apache-2.0 OR MIT', 'Unicode-3.0', 'BSD-2-Clause AND (Apache-2.0 OR MIT)',
+        'Unlicense OR MIT', 'MIT OR Apache-2.0', 'MIT', 'MIT/Apache-2.0', 'Zlib',
+        'MPL-2.0', 'Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT',
+        'MIT OR Apache-2.0 OR LGPL-2.1-or-later', 'Apache-2.0 OR BSL-1.0',
+        'Unlicense/MIT', 'BSD-2-Clause', '(MIT OR Apache-2.0) AND Unicode-3.0',
+        'BSD-2-Clause OR Apache-2.0 OR MIT',
+    }
     if not found or found - known:
         raise SystemExit('Review unrecognized Rust standard-library licenses: ' + ', '.join(sorted(found - known)))
     documents = [{'title': 'COPYRIGHT-library (readable)', 'text': plain},
